@@ -1,0 +1,44 @@
+{
+  "name": "nihonpath",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.11.2",
+  "scripts": {
+    "lint": "pnpm run lint:ts && pnpm run lint:dart",
+    "lint:ts": "eslint . --no-warn-ignored",
+    "lint:dart": "dart analyze .",
+    "format:check": "prettier --check .",
+    "format": "prettier --write .",
+    "format:dart:check": "dart format --output=none --set-exit-if-changed .",
+    "format:dart": "dart format .",
+    "format:all": "pnpm run format && pnpm run format:dart",
+    "format:all:check": "pnpm run format:check && pnpm run format:dart:check",
+    "prepare": "husky || true",
+    "commitlint": "commitlint --from=HEAD~1"
+  },
+  "lint-staged": {
+    "*.{ts,js,mjs,cjs}": [
+      "eslint --max-warnings 0 --no-warn-ignored",
+      "prettier --write"
+    ],
+    "*.{json,yaml,yml}": [
+      "prettier --write"
+    ],
+    "*.dart": [
+      "dart format"
+    ]
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.7.1",
+    "@commitlint/config-conventional": "^19.7.1",
+    "@eslint/js": "^9.20.0",
+    "eslint": "^9.20.1",
+    "eslint-config-prettier": "^10.0.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3",
+    "prettier": "^3.5.0",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.24.0"
+  }
+}

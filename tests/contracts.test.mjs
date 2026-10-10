@@ -98,14 +98,24 @@ test('Generated TypeScript types integrity & compilation (§0 Aturan 2)', () => 
   assert.equal(tscCheck.status, 0, `tsc --noEmit failed: ${tscCheck.stderr || tscCheck.stdout}`);
 });
 
-test('Generated Dart client integrity & compilation (§0 Aturan 2)', () => {
+test('Generated Dart client integrity & compilation (§0 Aturan 2)', (t) => {
   const libFile = resolve(dartApiDir, 'lib/nihonpath_api.dart');
   assert.ok(existsSync(libFile), 'nihonpath_api.dart must exist');
 
-  // Dart analyze check
+  // Check if dart is available on PATH (may be absent in Node-only CI environments)
   const isWindows = process.platform === 'win32';
-  const dartCheck = spawnSync('dart', ['analyze', 'apps/mobile/lib/data/api'], {
-    cwd: rootDir,
+  const dartAvailable = spawnSync('dart', ['--version'], { shell: isWindows });
+  if (dartAvailable.status !== 0 || !dartAvailable.status === null) {
+    t.skip('Dart SDK is not installed in this environment; skipping dart analyze check.');
+    return;
+  }
+
+  // Ensure packages are resolved
+  spawnSync('dart', ['pub', 'get'], { cwd: dartApiDir, shell: isWindows });
+
+  // Dart analyze check
+  const dartCheck = spawnSync('dart', ['analyze', '.'], {
+    cwd: dartApiDir,
     encoding: 'utf-8',
     shell: isWindows,
   });

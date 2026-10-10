@@ -105,6 +105,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Resolve API client dependencies
+        run: |
+          cd apps/mobile/lib/data/api && dart pub get
+
       - name: Verify OpenAPI breaking changes (oasdiff)
         if: github.event_name == 'pull_request'
         run: |

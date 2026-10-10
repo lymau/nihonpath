@@ -67,7 +67,9 @@ async function main() {
 
   // 3. Verify Dart client compiles and passes static analysis
   log('CHECK_DART', 'Verifying Dart static analysis (apps/mobile/lib/data/api)...');
-  const dartResult = runCommand('dart', ['analyze', 'apps/mobile/lib/data/api'], rootDir);
+  const dartApiDir = resolve(rootDir, 'apps/mobile/lib/data/api');
+  runCommand('dart', ['pub', 'get'], dartApiDir);
+  const dartResult = runCommand('dart', ['analyze', '.'], dartApiDir);
   if (dartResult.status !== 0) {
     // eslint-disable-next-line no-console
     console.error(`[verify:contracts] [ERROR] Dart analysis failed:\n${dartResult.stderr || dartResult.stdout}`);

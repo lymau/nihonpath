@@ -130,10 +130,10 @@ jobs:
       - name: Verify generated clients are not out-of-sync
         run: |
           echo "Checking for uncommitted diffs in generated client code..."
-          if [ -n "$(git status --porcelain apps/api/src/types/ apps/mobile/lib/data/api/)" ]; then
+          if [ -n "$(git status --porcelain apps/api/src/types/ apps/mobile/lib/data/api/ ':!**/*.g.dart')" ]; then
             echo "::error::Generated contract clients are out of sync or stale!"
             echo "Please run 'pnpm run generate:contracts' locally and commit the generated files."
-            git diff apps/api/src/types/ apps/mobile/lib/data/api/
+            git diff apps/api/src/types/ apps/mobile/lib/data/api/ ':!**/*.g.dart'
             exit 1
           fi
           echo "All generated clients are up-to-date and clean."

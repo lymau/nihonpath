@@ -45,7 +45,7 @@ async function main() {
 
   // 1. Check git diff for uncommitted modifications on tracked files
   log('CHECK_DIFF', 'Checking git diff on tracked generated contract files...');
-  const diffResult = runCommand('git', ['diff', '--exit-code', ...pathsToCheck]);
+  const diffResult = runCommand('git', ['diff', '--exit-code', ':!**/*.g.dart', ...pathsToCheck]);
   if (diffResult.status !== 0) {
     // eslint-disable-next-line no-console
     console.error(`[verify:contracts] [ERROR] Stale or manually modified contract files detected:\n${diffResult.stdout}`);

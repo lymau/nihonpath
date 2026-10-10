@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.nihonpath.com/content/vocab.schema.json",
+  "title": "VocabContentItem",
+  "description": "JSON Schema untuk item kosakata (vocab) NihonPath (§9.1, §9.2).",
+  "type": "object",
+  "required": [
+    "external_key",
+    "type",
+    "jlpt_level",
+    "written",
+    "reading_kana",
+    "pos",
+    "meanings",
+    "audio",
+    "examples",
+    "source"
+  ],
+  "properties": {
+    "external_key": {
+      "type": "string",
+      "pattern": "^vocab:[a-z0-9_-]+:[a-z0-9_.-]+$",
+      "description": "Kunci unik eksternal item vocab, misal vocab:jmdict:1358280"
+    },
+    "type": {
+      "type": "string",
+      "const": "vocab"
+    },
+    "jlpt_level": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Level JLPT kosakata (5 = N5, .. 1 = N1)"
+    },
+    "written": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Representasi tertulis dengan ruby furigana per segmen",
+      "items": {
+        "type": "object",
+        "required": ["t"],
+        "properties": {
+          "t": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Karakter atau kata tertulis"
+          },
+          "r": {
+            "type": "string",
+            "description": "Furigana/ruby pembacaan kana jika t berupa kanji"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "reading_kana": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Pembacaan kana lengkap tanpa furigana segmen, misal たべる"
+    },
+    "pos": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Daftar kelas kata (parts of speech), misal ['v1', 'vt', 'n']",
+      "items": {
+        "type": "string"
+      }
+    },
+    "meanings": {
+      "type": "object",
+      "description": "Arti kosakata dalam bahasa Indonesia dan Inggris",
+      "required": ["id", "en"],
+      "properties": {
+        "id": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "en": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "audio": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Daftar berkas audio pelafalan (minimal 1 audio sesuai §9.1)",
+      "items": {
+        "type": "object",
+        "required": ["voice", "file"],
+        "properties": {
+          "voice": {
+            "type": "string",
+            "description": "Identifier suara (misal f1, m1)"
+          },
+          "file": {
+            "type": "string",
+            "description": "Path relatif berkas opus dalam paket audio"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "examples": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Kalimat contoh pemakaian (minimal 1 contoh sesuai §9.1)",
+      "items": {
+        "type": "object",
+        "required": ["ja", "id", "en"],
+        "properties": {
+          "tatoeba_id": {
+            "type": "integer"
+          },
+          "ja": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["t"],
+              "properties": {
+                "t": { "type": "string" },
+                "r": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "en": {
+            "type": "string",
+            "minLength": 1
+          },
+          "audio": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["voice", "file"],
+              "properties": {
+                "voice": { "type": "string" },
+                "file": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "mnemonic": {
+      "type": "object",
+      "required": ["id", "provenance"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Mnemonik dalam bahasa Indonesia"
+        },
+        "en": {
+          "type": "string",
+          "description": "Mnemonik dalam bahasa Inggris"
+        },
+        "provenance": {
+          "type": "string",
+          "enum": ["human_reviewed", "llm_draft"],
+          "description": "Asal pembuatan mnemonik (§9.1)"
+        },
+        "reviewed_by": {
+          "type": "string",
+          "description": "Pengenal reviewer jika berstatus human_reviewed"
+        }
+      },
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Atribusi sumber lisensi (§3.2, §9.2)",
+      "items": {
+        "type": "object",
+        "required": ["name", "license"],
+        "properties": {
+          "name": { "type": "string" },
+          "license": { "type": "string" },
+          "url": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

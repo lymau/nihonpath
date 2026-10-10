@@ -2,5 +2,9 @@
   "name": "@nihonpath/contracts",
   "version": "0.1.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "generate": "node ../../scripts/generate-contracts.mjs",
+    "verify": "node ../../scripts/verify-contracts.mjs"
+  }
 }

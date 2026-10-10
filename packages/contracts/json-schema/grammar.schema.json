@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.nihonpath.com/content/grammar.schema.json",
+  "title": "GrammarContentItem",
+  "description": "JSON Schema untuk item pola tata bahasa (grammar) NihonPath (§3.4, §9.1).",
+  "type": "object",
+  "required": [
+    "external_key",
+    "type",
+    "jlpt_level",
+    "title",
+    "formation",
+    "meaning_summary",
+    "explanation",
+    "examples",
+    "source"
+  ],
+  "properties": {
+    "external_key": {
+      "type": "string",
+      "pattern": "^grammar:[a-z0-9_-]+:[a-z0-9_.-]+$",
+      "description": "Kunci unik eksternal tata bahasa, misal grammar:jlpt:n5-te-wa-ikenai"
+    },
+    "type": {
+      "type": "string",
+      "const": "grammar"
+    },
+    "jlpt_level": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Level JLPT tata bahasa (5 = N5, .. 1 = N1)"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Nama pola tata bahasa, misal 〜てはいけない"
+    },
+    "formation": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "Aturan pembentukan/konjugasi, misal ['Kata kerja bentuk -te + は + いけない']"
+    },
+    "meaning_summary": {
+      "type": "object",
+      "description": "Ringkasan arti pola kalimat dalam ID dan EN",
+      "required": ["id", "en"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "en": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "explanation": {
+      "type": "object",
+      "description": "Penjelasan detail nuansa dan penggunaan pola tata bahasa",
+      "required": ["id", "en"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "en": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "examples": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Contoh kalimat untuk latihan cloze / fill-in-the-blank (§3.4)",
+      "items": {
+        "type": "object",
+        "required": ["ja", "id", "en"],
+        "properties": {
+          "ja": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["t"],
+              "properties": {
+                "t": { "type": "string" },
+                "r": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "id": { "type": "string", "minLength": 1 },
+          "en": { "type": "string", "minLength": 1 },
+          "cloze_target": {
+            "type": "string",
+            "description": "Bagian kalimat yang dirumpangkan untuk soal SRS cloze"
+          },
+          "cloze_options": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Pilihan jawaban pilihan ganda untuk soal cloze"
+          },
+          "audio": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["voice", "file"],
+              "properties": {
+                "voice": { "type": "string" },
+                "file": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "caution": {
+      "type": "object",
+      "description": "Catatan jebakan umum atau pantangan penggunaan",
+      "properties": {
+        "id": { "type": "string" },
+        "en": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "license"],
+        "properties": {
+          "name": { "type": "string" },
+          "license": { "type": "string" },
+          "url": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

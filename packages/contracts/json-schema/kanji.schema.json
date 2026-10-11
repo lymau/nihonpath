@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.nihonpath.com/content/kanji.schema.json",
+  "title": "KanjiContentItem",
+  "description": "JSON Schema untuk item kanji NihonPath (§3.4, §9.1).",
+  "type": "object",
+  "required": [
+    "external_key",
+    "type",
+    "jlpt_level",
+    "character",
+    "stroke_count",
+    "readings",
+    "meanings",
+    "source"
+  ],
+  "properties": {
+    "external_key": {
+      "type": "string",
+      "pattern": "^kanji:[a-z0-9_-]+:[^:]+$",
+      "description": "Kunci unik eksternal item kanji, misal kanji:kanjidic:食"
+    },
+    "type": {
+      "type": "string",
+      "const": "kanji"
+    },
+    "jlpt_level": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Level JLPT kanji (5 = N5, .. 1 = N1)"
+    },
+    "character": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2,
+      "description": "Karakter kanji tunggal"
+    },
+    "stroke_count": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Jumlah goresan kanji"
+    },
+    "stroke_order_svg": {
+      "type": "string",
+      "description": "Path relatif berkas SVG urutan goresan dalam paket strokes"
+    },
+    "radicals": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Radikal dasar pembentuk kanji"
+    },
+    "readings": {
+      "type": "object",
+      "description": "Daftar pembacaan On'yomi dan Kun'yomi",
+      "required": ["on", "kun"],
+      "properties": {
+        "on": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Pembacaan On'yomi (biasanya katakana)"
+        },
+        "kun": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Pembacaan Kun'yomi (biasanya hiragana dengan okurigana jika ada)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "meanings": {
+      "type": "object",
+      "description": "Makna kanji dalam bahasa Indonesia dan Inggris",
+      "required": ["id", "en"],
+      "properties": {
+        "id": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "en": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "components": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Dekomposisi komponen visual kanji (§2)"
+    },
+    "mnemonic": {
+      "type": "object",
+      "required": ["id", "provenance"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Mnemonik dalam bahasa Indonesia"
+        },
+        "en": {
+          "type": "string",
+          "description": "Mnemonik dalam bahasa Inggris"
+        },
+        "provenance": {
+          "type": "string",
+          "enum": ["human_reviewed", "llm_draft"],
+          "description": "Asal pembuatan mnemonik (§9.1)"
+        },
+        "reviewed_by": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Atribusi sumber lisensi (§3.2)",
+      "items": {
+        "type": "object",
+        "required": ["name", "license"],
+        "properties": {
+          "name": { "type": "string" },
+          "license": { "type": "string" },
+          "url": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

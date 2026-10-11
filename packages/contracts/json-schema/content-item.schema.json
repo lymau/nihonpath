@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.nihonpath.com/content/content-item.schema.json",
+  "title": "NihonPathContentItem",
+  "description": "Unified JSON Schema untuk entitas konten NihonPath (vocab, kanji, grammar, kana) (§9.1, §9.2).",
+  "oneOf": [
+    { "$ref": "./vocab.schema.json" },
+    { "$ref": "./kanji.schema.json" },
+    { "$ref": "./grammar.schema.json" },
+    { "$ref": "./kana.schema.json" }
+  ]
+}

@@ -40,6 +40,9 @@ jobs:
       - name: Lint TypeScript (ESLint)
         run: pnpm run lint:ts
 
+      - name: Run unit tests
+        run: pnpm test
+
       - name: Validate Conventional Commits
         if: github.event_name == 'pull_request'
         run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
@@ -57,8 +60,80 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Resolve API client dependencies
+        run: |
+          cd apps/mobile/lib/data/api && dart pub get
+
       - name: Verify Dart formatting
         run: dart format --output=none --set-exit-if-changed .
 
       - name: Analyze Dart code
         run: dart analyze --fatal-infos --fatal-warnings .
+
+  contracts-ci:
+    name: Contracts & Code Generation Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.11.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve API client dependencies
+        run: |
+          cd apps/mobile/lib/data/api && dart pub get
+
+      - name: Verify OpenAPI breaking changes (oasdiff)
+        if: github.event_name == 'pull_request'
+        run: |
+          if git cat-file -e ${{ github.event.pull_request.base.sha }}:packages/contracts/openapi.yaml 2>/dev/null; then
+            echo "Base openapi.yaml found on target branch. Running oasdiff breaking change detection..."
+            git show ${{ github.event.pull_request.base.sha }}:packages/contracts/openapi.yaml > base-openapi.yaml
+            curl -fsSL https://raw.githubusercontent.com/tufin/oasdiff/main/install.sh | sh
+            ./bin/oasdiff breaking base-openapi.yaml packages/contracts/openapi.yaml --fail-on ERR
+          else
+            echo "Base openapi.yaml does not exist on base branch yet. Skipping oasdiff breaking check."
+          fi
+
+      - name: Run contract unit tests
+        run: pnpm test
+
+      - name: Regenerate contract clients
+        run: pnpm run generate:contracts
+
+      - name: Verify generated clients are not out-of-sync
+        run: |
+          echo "Checking for uncommitted diffs in generated client code..."
+          if [ -n "$(git status --porcelain apps/api/src/types/ apps/mobile/lib/data/api/ ':!**/*.g.dart')" ]; then
+            echo "::error::Generated contract clients are out of sync or stale!"
+            echo "Please run 'pnpm run generate:contracts' locally and commit the generated files."
+            git diff apps/api/src/types/ apps/mobile/lib/data/api/ ':!**/*.g.dart'
+            exit 1
+          fi
+          echo "All generated clients are up-to-date and clean."

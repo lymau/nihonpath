@@ -35,6 +35,7 @@ export default tseslint.config(
       '**/build/**',
       '**/.dart_tool/**',
       'scripts/**',
+      'tests/**',
       'docs/**',
       '*.config.*',
     ],

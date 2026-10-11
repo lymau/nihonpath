@@ -15,7 +15,10 @@
     "format:all": "pnpm run format && pnpm run format:dart",
     "format:all:check": "pnpm run format:check && pnpm run format:dart:check",
     "prepare": "husky || true",
-    "commitlint": "commitlint --from=HEAD~1"
+    "commitlint": "commitlint --from=HEAD~1",
+    "test": "node --test tests/**/*.test.mjs",
+    "generate:contracts": "node scripts/generate-contracts.mjs",
+    "verify:contracts": "node scripts/verify-contracts.mjs"
   },
   "lint-staged": {
     "*.{ts,js,mjs,cjs}": [
@@ -33,12 +36,15 @@
     "@commitlint/cli": "^19.7.1",
     "@commitlint/config-conventional": "^19.7.1",
     "@eslint/js": "^9.20.0",
+    "@openapitools/openapi-generator-cli": "^2.41.0",
     "eslint": "^9.20.1",
     "eslint-config-prettier": "^10.0.1",
     "husky": "^9.1.7",
     "lint-staged": "^15.4.3",
+    "openapi-typescript": "^7.13.0",
     "prettier": "^3.5.0",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.24.0"
+    "typescript-eslint": "^8.24.0",
+    "yaml": "^2.9.1"
   }
 }

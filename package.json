@@ -18,7 +18,12 @@
     "commitlint": "commitlint --from=HEAD~1",
     "test": "node --test tests/**/*.test.mjs",
     "generate:contracts": "node scripts/generate-contracts.mjs",
-    "verify:contracts": "node scripts/verify-contracts.mjs"
+    "verify:contracts": "node scripts/verify-contracts.mjs",
+    "docker:up": "node scripts/docker-runner.mjs up -d",
+    "docker:down": "node scripts/docker-runner.mjs down",
+    "docker:status": "node scripts/docker-runner.mjs ps",
+    "docker:logs": "node scripts/docker-runner.mjs logs -f",
+    "docker:verify": "node scripts/verify-local-env.mjs"
   },
   "lint-staged": {
     "*.{ts,js,mjs,cjs}": [

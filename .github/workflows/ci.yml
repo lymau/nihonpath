@@ -144,3 +144,26 @@ jobs:
             exit 1
           fi
           echo "All generated clients are up-to-date and clean."
+
+  terraform-ci:
+    name: Terraform Format, Validate & Dev Plan Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+
+      - name: Verify Terraform formatting
+        run: terraform fmt -check -recursive infra/terraform
+
+      - name: Execute Terraform verification suite & dev plan check
+        run: node scripts/verify-terraform.mjs

@@ -73,3 +73,35 @@ Dokumen pencatatan keputusan teknis dan arsitektural proyek NihonPath (format: t
   - LocalStack Community Edition berlisensi Apache 2.0 yang permisif, aktif dipelihara, dan merupakan standar de facto industri untuk emulasi API AWS S3 lokal.
   - Memenuhi aturan §0 Aturan 1 & 8 dan seluruh kriteria DoD milestone M0-3.
 
+---
+
+## 2026-10-14 — [M0-4a] Terraform Jaringan & Layanan Container Dev
+
+- **Tanggal:** 2026-10-14
+- **Konteks:** Penyusunan modul Terraform untuk infrastruktur jaringan (VPC, Subnet multi-AZ) dan runtime container layanan API dan Worker di environment dev (§4.2, §11.2, §14.1, §14.2).
+- **Keputusan:**
+  1. **Remote State Backend (S3 & DynamoDB Locking):**
+     - Menggunakan backend S3 dengan state locking via DynamoDB di region `ap-southeast-3` (Jakarta), enkripsi at-rest aktif (`encrypt = true`), dan pemisahan path state (`dev/terraform.tfstate`).
+  2. **Modul Jaringan (`infra/terraform/modules/network`):**
+     - VPC dengan DNS support dan hostnames aktif di region Jakarta (`ap-southeast-3`).
+     - Subnet public dan private multi-AZ di `ap-southeast-3a`, `ap-southeast-3b`, dan `ap-southeast-3c`.
+     - Internet Gateway dan NAT Gateway (konfigurasi single NAT untuk efisiensi biaya dev via `single_nat_gateway`).
+     - Security Groups tersegmentasi: ALB SG (inbound 80/443), API SG (hanya menerima traffic port 3000 dari ALB SG), dan Worker SG (tanpa inbound, hanya outbound).
+  3. **Modul Compute Layanan Container (`infra/terraform/modules/compute`):**
+     - ECS Cluster Fargate dengan Container Insights aktif.
+     - Application Load Balancer dengan healthcheck target group ke path `/healthz`.
+     - Layanan API NestJS dengan Fargate launch type di private subnet, terhubung ke ALB, dan autoscaling target tracking CPU 60% (§11.2) dengan kapasitas 2–5 container.
+     - Layanan Worker BullMQ (1 container) di private subnet.
+     - CloudWatch Log Groups terstruktur per service (`/ecs/nihonpath-dev-api` dan `/ecs/nihonpath-dev-worker`).
+  4. **IAM Least Privilege (§12.1):**
+     - Task execution role terpisah dengan akses khusus ECR dan CloudWatch logs.
+     - Task role terpisah untuk API dan Worker tanpa izin administratif berlebih.
+  5. **Tooling & Verifikasi CI/CD:**
+     - Menyiapkan script terstruktur `scripts/verify-terraform.mjs` yang memvalidasi formatting, inisialisasi modul, dependency resolution, eksekusi plan dev, serta memverifikasi tidak ada kebocoran file secret `.tfvars` atau file `.tfstate`.
+     - Menambahkan script `npm run terraform:fmt`, `terraform:fmt:check`, dan `terraform:verify`.
+     - Menambahkan test suite `tests/terraform.test.mjs` dan job `terraform-ci` pada `.github/workflows/ci.yml`.
+- **Alasan:**
+  - Menjamin arsitektur dev reproducible, terisolasi, hemat biaya untuk skala awal, dan siap diskalakan horizontal sesuai tahapan tangga skala §11.2.
+  - Sesuai standar DoD milestone M0-4a dan batasan arsitektur §0, §4.2, §11.2, §12.1, dan §14.
+
+

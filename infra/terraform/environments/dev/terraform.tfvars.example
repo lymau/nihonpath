@@ -1,0 +1,13 @@
+# Example variables for dev environment
+aws_region           = "ap-southeast-3"
+environment          = "dev"
+name_prefix          = "nihonpath"
+vpc_cidr             = "10.0.0.0/16"
+single_nat_gateway   = true
+api_cpu              = 256
+api_memory           = 512
+api_min_capacity     = 2
+api_max_capacity     = 5
+worker_cpu           = 256
+worker_memory        = 512
+worker_desired_count = 1

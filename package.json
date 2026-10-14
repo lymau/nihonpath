@@ -23,7 +23,10 @@
     "docker:down": "node scripts/docker-runner.mjs down",
     "docker:status": "node scripts/docker-runner.mjs ps",
     "docker:logs": "node scripts/docker-runner.mjs logs -f",
-    "docker:verify": "node scripts/verify-local-env.mjs"
+    "docker:verify": "node scripts/verify-local-env.mjs",
+    "terraform:fmt": "terraform fmt -recursive infra/terraform",
+    "terraform:fmt:check": "terraform fmt -check -recursive infra/terraform",
+    "terraform:verify": "node scripts/verify-terraform.mjs"
   },
   "lint-staged": {
     "*.{ts,js,mjs,cjs}": [

@@ -116,7 +116,14 @@ jobs:
             echo "Base openapi.yaml found on target branch. Running oasdiff breaking change detection..."
             git show ${{ github.event.pull_request.base.sha }}:packages/contracts/openapi.yaml > base-openapi.yaml
             curl -fsSL https://raw.githubusercontent.com/tufin/oasdiff/main/install.sh | sh
-            ./bin/oasdiff breaking base-openapi.yaml packages/contracts/openapi.yaml --fail-on ERR
+            if command -v oasdiff >/dev/null 2>&1; then
+              oasdiff breaking base-openapi.yaml packages/contracts/openapi.yaml --fail-on ERR
+            elif [ -f "./bin/oasdiff" ]; then
+              ./bin/oasdiff breaking base-openapi.yaml packages/contracts/openapi.yaml --fail-on ERR
+            else
+              echo "::error::oasdiff binary not found after installation"
+              exit 1
+            fi
           else
             echo "Base openapi.yaml does not exist on base branch yet. Skipping oasdiff breaking check."
           fi

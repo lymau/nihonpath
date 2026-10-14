@@ -1,0 +1,234 @@
+services:
+  # ============================================================================
+  # 1. PostgreSQL 16 (dengan ekstensi citext) (§4.2, §6.3, §14.2)
+  # ============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: nihonpath-postgres
+    restart: unless-stopped
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-nihonpath_dev}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-nihonpath_dev}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - nihonpath-net
+
+  # ============================================================================
+  # 2. Redis 7 (Alpine) (§4.2, §8.1, §14.1)
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: nihonpath-redis
+    restart: unless-stopped
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli ping | grep PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+    networks:
+      - nihonpath-net
+
+  # ============================================================================
+  # 3. LocalStack S3 Emulator (§4.2, §9.3, §14.2) - Pengganti MinIO
+  # ============================================================================
+  localstack:
+    image: localstack/localstack:3.8
+    container_name: nihonpath-localstack
+    restart: unless-stopped
+    ports:
+      - '${LOCALSTACK_PORT:-4566}:4566'
+    environment:
+      SERVICES: s3
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-southeast-3}
+      DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-southeast-3}
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - ./docker/localstack/init:/etc/localstack/init/ready.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'awslocal s3 ls || exit 1']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - nihonpath-net
+
+  # ============================================================================
+  # 4. Grafana Tempo (Distributed Tracing) (§4.2, §10.4)
+  # ============================================================================
+  tempo:
+    image: grafana/tempo:2.6.0
+    container_name: nihonpath-tempo
+    restart: unless-stopped
+    command: ['-config.file=/etc/tempo.yaml']
+    volumes:
+      - ./docker/tempo/tempo-config.yaml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - '${TEMPO_PORT:-3200}:3200' # Tempo Query & Readiness HTTP
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://localhost:3200/ready || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - nihonpath-net
+
+  # ============================================================================
+  # 5. Grafana Loki (Log Aggregation & OTLP Ingestion) (§4.2, §10.2)
+  # ============================================================================
+  loki:
+    image: grafana/loki:3.1.1
+    container_name: nihonpath-loki
+    restart: unless-stopped
+    command: ['-config.file=/etc/loki/local-config.yaml']
+    volumes:
+      - ./docker/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    ports:
+      - '${LOKI_PORT:-3100}:3100'
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - nihonpath-net
+
+  # ============================================================================
+  # 6. OpenTelemetry Collector Contrib (§4.2, §10.4)
+  # ============================================================================
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    container_name: nihonpath-otel-collector
+    restart: unless-stopped
+    command: ['--config=/etc/otelcol-contrib/config.yaml']
+    volumes:
+      - ./docker/otel/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - '${OTEL_GRPC_PORT:-4317}:4317' # OTLP gRPC receiver
+      - '${OTEL_HTTP_PORT:-4318}:4318' # OTLP HTTP receiver
+      - '${OTEL_METRICS_PORT:-8888}:8888' # Internal Collector metrics
+      - '${OTEL_PROM_PORT:-8889}:8889' # Prometheus metrics exporter
+      - '13133:13133' # Health check extension
+    depends_on:
+      tempo:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://localhost:13133/ || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - nihonpath-net
+
+  # ============================================================================
+  # 7. Prometheus (§4.2, §10.3)
+  # ============================================================================
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: nihonpath-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - '${PROMETHEUS_PORT:-9090}:9090'
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-verbose --tries=1 --spider http://localhost:9090/-/healthy || exit 1',
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - nihonpath-net
+
+  # ============================================================================
+  # 8. Grafana Dashboard (§4.2, §10.7)
+  # ============================================================================
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: nihonpath-grafana
+    restart: unless-stopped
+    ports:
+      - '${GRAFANA_PORT:-3000}:3000'
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: 'Viewer'
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1',
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - nihonpath-net
+
+# ==============================================================================
+# Persistent Named Volumes & Networks
+# ==============================================================================
+volumes:
+  postgres_data:
+  redis_data:
+  localstack_data:
+  tempo_data:
+  loki_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  nihonpath-net:
+    driver: bridge

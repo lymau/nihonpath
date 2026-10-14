@@ -44,3 +44,32 @@ Dokumen pencatatan keputusan teknis dan arsitektural proyek NihonPath (format: t
 - **Alasan:**
   - Menjamin prinsip contract-first: tipe backend dan klien mobile selalu diturunkan dari single source of truth (`openapi.yaml`), mencegah inkonsistensi payload antara backend NestJS dan mobile Flutter.
   - Sesuai standar DoD milestone M0-2 dan batasan arsitektur §0, §8, §9, dan §14.
+
+---
+
+## 2026-10-14 — [M0-3] Docker Compose Lokal & Observability Stack (Penggantian MinIO ke LocalStack)
+
+- **Tanggal:** 2026-10-14
+- **Konteks:** Penyediaan lingkungan pengembangan lokal terpadu menggunakan docker-compose yang mencakup database, cache, storage, dan stack observability (§4.2, §10, §14.2) dengan kompatibilitas penuh terhadap Podman.
+- **Keputusan:**
+  1. **Penggantian MinIO dengan LocalStack (S3 Community Edition):**
+     - Mengganti service MinIO dengan `localstack/localstack:3.8` (S3 emulator).
+     - Mengotomatisasi inisialisasi bucket `s3://nihonpath-packs` dan `s3://nihonpath-audio` melalui lifecycle hook `/etc/localstack/init/ready.d/01-create-buckets.sh` di region `ap-southeast-3` (Jakarta §4.2).
+  2. **Database PostgreSQL 16 & Redis:**
+     - Menggunakan image `postgres:16-alpine` dengan inisialisasi ekstensi `citext` dan `uuid-ossp` via `docker/postgres/init/01-init.sql`.
+     - Menggunakan image `redis:7-alpine` untuk rate limiting dan antrean BullMQ.
+  3. **Stack Observability Tiga Pilar (OpenTelemetry):**
+     - OTel Collector (`otel/opentelemetry-collector-contrib:0.111.0`) sebagai gerbang sentral penerima OTLP via gRPC (`4317`) dan HTTP (`4318`).
+     - Metrik disalurkan ke Prometheus (`prom/prometheus:v2.54.1`).
+     - Log disalurkan ke Loki (`grafana/loki:3.1.1`) dengan OTLP HTTP ingestion.
+     - Trace disalurkan ke Tempo (`grafana/tempo:2.6.0`).
+     - Grafana (`grafana/grafana:11.2.0`) terkonfigurasi dengan datasource saling tertaut (Prometheus, Loki dengan derived field TraceID, dan Tempo dengan tracesToLogs) serta starter dashboard *Service Overview*.
+  4. **Kompatibilitas Podman & Named Volumes:**
+     - Seluruh persistensi data menggunakan top-level named volumes (`postgres_data`, `redis_data`, `localstack_data`, `prometheus_data`, `loki_data`, `tempo_data`, `grafana_data`) untuk menghindari isu hak akses filesystem host/WSL2 pada mode rootless.
+     - Disediakan runner lintas-platform `scripts/docker-runner.mjs` yang secara deterministik mendeteksi `python -m podman_compose`, `podman-compose`, `podman compose`, maupun `docker compose`.
+     - Script automasi `npm run docker:up`, `docker:down`, `docker:status`, `docker:logs`, dan `docker:verify` serta `Makefile` siap pakai.
+- **Alasan:**
+  - MinIO resmi mengarsipkan repositori open source publiknya (read-only) serta menghentikan pembaruan binary & Docker image resmi untuk Community Edition gratis demi fokus ke lini produk komersial berbayar (AIStor).
+  - LocalStack Community Edition berlisensi Apache 2.0 yang permisif, aktif dipelihara, dan merupakan standar de facto industri untuk emulasi API AWS S3 lokal.
+  - Memenuhi aturan §0 Aturan 1 & 8 dan seluruh kriteria DoD milestone M0-3.
+

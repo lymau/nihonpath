@@ -11,3 +11,11 @@ api_max_capacity     = 5
 worker_cpu           = 256
 worker_memory        = 512
 worker_desired_count = 1
+postgres_engine_version = "16.4"
+postgres_instance_class = "db.t4g.micro"
+statement_timeout_ms    = 3000
+backup_retention_days   = 14
+pgbouncer_pool_mode     = "transaction"
+redis_engine_version    = "7.1"
+redis_node_type         = "cache.t4g.micro"
+

@@ -104,4 +104,40 @@ Dokumen pencatatan keputusan teknis dan arsitektural proyek NihonPath (format: t
   - Menjamin arsitektur dev reproducible, terisolasi, hemat biaya untuk skala awal, dan siap diskalakan horizontal sesuai tahapan tangga skala §11.2.
   - Sesuai standar DoD milestone M0-4a dan batasan arsitektur §0, §4.2, §11.2, §12.1, dan §14.
 
+---
+
+## 2026-10-16 — [M0-4b] Terraform Data Stores Dev (PostgreSQL & Redis HA, PgBouncer, Cross-Region PITR)
+
+- **Tanggal:** 2026-10-16
+- **Konteks:** Penyusunan modul Terraform untuk provisioning database PostgreSQL primary HA multi-AZ dengan replica, connection pooler PgBouncer mode transaction, cross-region continuous PITR ke Singapura, dan Redis ElastiCache HA di environment dev (§4.2, §11.2, §11.3, §11.4, §12.1, §14.1, §14.2).
+- **Keputusan:**
+  1. **PostgreSQL 16 Multi-AZ Primary + 1 Read Replica (`infra/terraform/modules/database`):**
+     - Menggunakan AWS RDS for PostgreSQL engine versi 16.4 dengan konfigurasi `multi_az = true` pada instance primary dan 1 read replica di subnet private lintas AZ Jakarta (`ap-southeast-3`).
+     - Storage gp3 dengan kapasitas awal 20 GB dan autoscaling hingga 100 GB, terenkripsi at-rest menggunakan customer-managed KMS key.
+     - Parameter group `postgres16` dengan konfigurasi wajib `statement_timeout = 3000` (3 detik) sesuai SLA/timeout §11.3, serta logging koneksi (`log_connections`, `log_disconnections`).
+  2. **Connection Pooling PgBouncer Mode Transaction (§11.2):**
+     - PgBouncer dijalankan sebagai container service di ECS Fargate (HA `desired_count = 2`) di private subnet di belakang internal Network Load Balancer (NLB) port 6432.
+     - Mode pooling ditetapkan ke `transaction` (`POOL_MODE = transaction`, `SERVER_RESET_QUERY = DISCARD ALL`) untuk optimalisasi reuse koneksi transaksional backend NestJS tanpa risiko kebocoran state koneksi.
+     - Endpoint NLB PgBouncer diinjeksikan secara otomatis ke compute API dan Worker via environment variable `DATABASE_URL`, sedangkan read replica diekspos melalui `DB_REPLICA_URL`.
+  3. **Continuous PITR & Cross-Region Backup Replication ke Singapura (§11.4):**
+     - Retensi backup snapshot dan continuous WAL archiving PITR disetel 14 hari pada RDS primary.
+     - Mengonfigurasi `aws_db_instance_automated_backups_replication` dengan provider alias `aws.singapore` (`ap-southeast-1`) dan KMS key replikasi terdedikasi di region Singapura dengan retensi 14 hari, memastikan pemenuhan RPO ≤ 5 menit dan RTO ≤ 1 jam.
+  4. **Redis ElastiCache HA (Multi-AZ) (§4.2, §11.2):**
+     - Menggunakan `aws_elasticache_replication_group` Redis versi 7.1 dengan 2 node multi-AZ dan `automatic_failover_enabled = true`.
+     - Parameter group ElastiCache dikonfigurasi dengan `maxmemory-policy = noeviction` untuk menjamin keandalan dan durabilitas antrean job BullMQ.
+     - Enkripsi at-rest dan in-transit aktif dengan autentikasi auth token yang aman.
+  5. **Integrasi Credential ke Secrets Manager & KMS (§12.1):**
+     - Seluruh password dan token digenerate otomatis menggunakan resource Terraform `random_password`.
+     - Kredensial dan metadata koneksi database serta Redis disimpan terpusat di AWS Secrets Manager yang dienkripsi oleh KMS key dengan rotasi kunci otomatis aktif (`enable_key_rotation = true`).
+  6. **Observability & Cloud Monitoring (§10, §11):**
+     - Mengaktifkan Enhanced Monitoring RDS dengan IAM role `AmazonRDSEnhancedMonitoringRole` pada interval 60 detik.
+     - Menyiapkan CloudWatch Metric Alarms untuk 4 metrik esensial: CPUUtilization (> 80% selama 15 menit sesuai SLO §11.2), FreeableMemory (< 256 MB), FreeStorageSpace (< 5 GB), dan DatabaseConnections (> 80 koneksi).
+  7. **Tooling & Verifikasi Otomatis:**
+     - Memperbarui `scripts/verify-terraform.mjs` untuk mendukung validasi modul database dengan alias provider, eksekusi plan dev, serta verifikasi arsitektur konektivitas PgBouncer dan parameter `statement_timeout`.
+     - Menambahkan 7 test suite baru di `tests/terraform.test.mjs` yang memvalidasi struktur modul database, parameter group, PgBouncer transaction mode, PITR replikasi Singapura, Redis HA, Secrets Manager, dan simulasi timeout query.
+- **Alasan:**
+  - Menjamin arsitektur database dev robust, highly available (Multi-AZ), siap menangani beban konkurensi dengan PgBouncer pooling, dan terlindungi dari bencana sesuai standar SLA/RPO/RTO §11.
+  - Memenuhi seluruh kriteria Definition of Done (DoD) milestone M0-4b dan batasan arsitektur §0, §4.2, §11.2, §11.3, §11.4, §12.1, dan §14.
+
+
 

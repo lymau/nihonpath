@@ -135,6 +135,70 @@ function verifyDatabaseConnectivityAndTimeoutSpec() {
   log('DB_CHECK', 'Database connectivity spec and statement_timeout (3s) verified successfully.');
 }
 
+function verifyStorageAndCdnSpecification() {
+  log('STORAGE_CDN_CHECK', 'Verifying Storage versioning, CDN read-mostly rules, signed URLs, and KMS secret rotation (§4.2, §8.2, §9.3, §11.4, §12.1)...');
+  const storageMainTf = resolve(rootDir, 'infra/terraform/modules/storage/main.tf');
+  const cdnMainTf = resolve(rootDir, 'infra/terraform/modules/cdn/main.tf');
+  const secretsMainTf = resolve(rootDir, 'infra/terraform/modules/secrets/main.tf');
+
+  const storageContent = readFileSync(storageMainTf, 'utf-8');
+  const cdnContent = readFileSync(cdnMainTf, 'utf-8');
+  const secretsContent = readFileSync(secretsMainTf, 'utf-8');
+
+  // Storage checks (§11.4, §12.1)
+  if (!storageContent.includes('status = "Enabled"')) {
+    // eslint-disable-next-line no-console
+    console.error('[verify:terraform] [ERROR] S3 bucket versioning is not enabled (§11.4).');
+    process.exit(1);
+  }
+  if (!storageContent.includes('block_public_acls       = true') || !storageContent.includes('restrict_public_buckets = true')) {
+    // eslint-disable-next-line no-console
+    console.error('[verify:terraform] [ERROR] S3 public access block not fully enforced (§12.1).');
+    process.exit(1);
+  }
+  if (!storageContent.includes('aws_iam_policy" "presigned_url_access"')) {
+    // eslint-disable-next-line no-console
+    console.error('[verify:terraform] [ERROR] Presigned URL IAM policy not defined in storage module (§8.2, §12.1).');
+    process.exit(1);
+  }
+
+  // CDN checks (§4.2, §8.2, §12.1)
+  if (!cdnContent.includes('aws_cloudfront_origin_access_control') || !cdnContent.includes('origin_access_control_id')) {
+    // eslint-disable-next-line no-console
+    console.error('[verify:terraform] [ERROR] CloudFront Origin Access Control (OAC) not configured.');
+    process.exit(1);
+  }
+  if (!cdnContent.includes('cached_methods         = ["GET", "HEAD"]') || !cdnContent.includes('viewer_protocol_policy = "redirect-to-https"')) {
+    // eslint-disable-next-line no-console
+    console.error('[verify:terraform] [ERROR] CDN read-mostly caching and HTTPS redirect rules missing.');
+    process.exit(1);
+  }
+  if (!cdnContent.includes('trusted_key_groups') || !cdnContent.includes('aws_cloudfront_key_group')) {
+    // eslint-disable-next-line no-console
+    console.error('[verify:terraform] [ERROR] CloudFront signed URL key group mechanism missing (§8.2, §12.1).');
+    process.exit(1);
+  }
+  if (!cdnContent.includes('5xxErrorRate') || !cdnContent.includes('4xxErrorRate')) {
+    // eslint-disable-next-line no-console
+    console.error('[verify:terraform] [ERROR] CloudFront observability alarms missing for error rates.');
+    process.exit(1);
+  }
+
+  // Secrets & KMS checks (§8.3, §12.1)
+  if (!secretsContent.includes('enable_key_rotation     = true')) {
+    // eslint-disable-next-line no-console
+    console.error('[verify:terraform] [ERROR] KMS key rotation not enabled on secrets CMK (§12.1).');
+    process.exit(1);
+  }
+  if (!secretsContent.includes('jwt_signing_key') || !secretsContent.includes('third_party_api_keys')) {
+    // eslint-disable-next-line no-console
+    console.error('[verify:terraform] [ERROR] Secrets Manager secrets for JWT or 3rd party API keys missing.');
+    process.exit(1);
+  }
+
+  log('STORAGE_CDN_CHECK', 'Storage, CDN, and Secret management specifications verified successfully.');
+}
+
 function testDevPlan() {
   const devDir = resolve(rootDir, 'infra/terraform/environments/dev');
   const overrideFile = resolve(devDir, 'backend_override.tf');
@@ -207,8 +271,12 @@ async function main() {
   validateDirectory('infra/terraform/modules/network');
   validateDirectory('infra/terraform/modules/compute');
   validateDirectory('infra/terraform/modules/database');
+  validateDirectory('infra/terraform/modules/storage');
+  validateDirectory('infra/terraform/modules/cdn');
+  validateDirectory('infra/terraform/modules/secrets');
   validateDirectory('infra/terraform/environments/dev');
   verifyDatabaseConnectivityAndTimeoutSpec();
+  verifyStorageAndCdnSpecification();
   testDevPlan();
   verifyNoSecretsCommitted();
   log('FINISH', 'All Terraform validation checks passed successfully.');

@@ -93,6 +93,49 @@ module "database" {
   tags                           = var.tags
 }
 
+module "storage" {
+  source = "../../modules/storage"
+
+  name_prefix               = var.name_prefix
+  environment               = var.environment
+  content_packs_bucket_name = var.content_packs_bucket_name
+  audio_bucket_name         = var.audio_bucket_name
+  cors_allowed_origins      = var.cors_allowed_origins
+  tags                      = var.tags
+}
+
+module "cdn" {
+  source = "../../modules/cdn"
+
+  name_prefix                               = var.name_prefix
+  environment                               = var.environment
+  content_packs_bucket_id                   = module.storage.content_packs_bucket_id
+  content_packs_bucket_arn                  = module.storage.content_packs_bucket_arn
+  content_packs_bucket_regional_domain_name = module.storage.content_packs_bucket_regional_domain_name
+  audio_bucket_id                           = module.storage.audio_bucket_id
+  audio_bucket_arn                          = module.storage.audio_bucket_arn
+  audio_bucket_regional_domain_name         = module.storage.audio_bucket_regional_domain_name
+  price_class                               = var.cloudfront_price_class
+  tags                                      = var.tags
+}
+
+module "secrets" {
+  source = "../../modules/secrets"
+
+  name_prefix               = var.name_prefix
+  environment               = var.environment
+  jwt_key_id                = var.jwt_key_id
+  jwt_algorithm             = var.jwt_algorithm
+  jwt_public_key_pem        = var.jwt_public_key_pem
+  jwt_private_key_pem       = var.jwt_private_key_pem
+  revenuecat_webhook_secret = var.revenuecat_webhook_secret
+  email_provider_api_key    = var.email_provider_api_key
+  google_oidc_client_secret = var.google_oidc_client_secret
+  apple_oidc_client_secret  = var.apple_oidc_client_secret
+  cloudfront_key_pair_id    = module.cdn.cloudfront_key_group_id
+  tags                      = var.tags
+}
+
 module "compute" {
   source = "../../modules/compute"
 
@@ -129,6 +172,26 @@ module "compute" {
       {
         name  = "REDIS_URL"
         value = "redis://:${module.database.redis_auth_token}@${module.database.redis_primary_endpoint}:${module.database.redis_port}"
+      },
+      {
+        name  = "STORAGE_PACKS_BUCKET"
+        value = module.storage.content_packs_bucket_id
+      },
+      {
+        name  = "STORAGE_AUDIO_BUCKET"
+        value = module.storage.audio_bucket_id
+      },
+      {
+        name  = "CDN_DOMAIN"
+        value = module.cdn.cloudfront_distribution_domain_name
+      },
+      {
+        name  = "JWT_SECRET_ARN"
+        value = module.secrets.jwt_signing_key_secret_arn
+      },
+      {
+        name  = "THIRD_PARTY_SECRETS_ARN"
+        value = module.secrets.third_party_api_keys_secret_arn
       }
     ],
     var.api_environment_variables
@@ -142,9 +205,30 @@ module "compute" {
       {
         name  = "REDIS_URL"
         value = "redis://:${module.database.redis_auth_token}@${module.database.redis_primary_endpoint}:${module.database.redis_port}"
+      },
+      {
+        name  = "STORAGE_PACKS_BUCKET"
+        value = module.storage.content_packs_bucket_id
+      },
+      {
+        name  = "STORAGE_AUDIO_BUCKET"
+        value = module.storage.audio_bucket_id
       }
     ],
     var.worker_environment_variables
   )
   tags = var.tags
+}
+
+# Attach IAM access policies to API task role (§8.2, §12.1)
+resource "aws_iam_role_policy_attachment" "api_presigned_url_access" {
+  role       = "${var.name_prefix}-${var.environment}-api-task-role"
+  policy_arn = module.storage.presigned_url_policy_arn
+  depends_on = [module.compute]
+}
+
+resource "aws_iam_role_policy_attachment" "api_secrets_read_access" {
+  role       = "${var.name_prefix}-${var.environment}-api-task-role"
+  policy_arn = module.secrets.secrets_read_policy_arn
+  depends_on = [module.compute]
 }

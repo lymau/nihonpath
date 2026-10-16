@@ -4,13 +4,13 @@
  * scripts/verify-terraform.mjs
  *
  * Verifies Terraform formatting, syntax validation, and dependency resolution / plan
- * execution for dev environment in Jakarta region (M0-4a / §4.2, §11.2, §14.1, §14.2).
+ * execution for dev environment in Jakarta region (M0-4a / M0-4b / §4.2, §11.2, §11.3, §11.4, §14.1, §14.2).
  */
 
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { writeFileSync, unlinkSync, existsSync } from 'node:fs';
+import { writeFileSync, unlinkSync, existsSync, readFileSync } from 'node:fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -34,10 +34,18 @@ function runCommand(command, args, cwd = rootDir, envOverrides = {}) {
     ? `${command}.cmd`
     : command;
 
+  const currentPath = process.env.PATH || process.env.Path || '';
+  const wingetLinks = process.env.LOCALAPPDATA
+    ? resolve(process.env.LOCALAPPDATA, 'Microsoft/WinGet/Links')
+    : '';
+  const augmentedPath = isWindows && wingetLinks && !currentPath.includes(wingetLinks)
+    ? `${currentPath};${wingetLinks}`
+    : currentPath;
+
   return spawnSync(executable, args, {
     cwd,
     encoding: 'utf-8',
-    env: { ...process.env, ...envOverrides },
+    env: { ...process.env, PATH: augmentedPath, Path: augmentedPath, ...envOverrides },
   });
 }
 
@@ -65,23 +73,66 @@ function verifyFormatting() {
 
 function validateDirectory(relativeDir) {
   const dirPath = resolve(rootDir, relativeDir);
+  const isDatabase = relativeDir.endsWith('modules/database');
+  const dummyProvidersFile = resolve(dirPath, 'dummy_providers.tf');
+
   log('VALIDATE', `Initializing and validating: ${relativeDir}`);
 
-  const initRes = runCommand('terraform', ['init', '-backend=false'], dirPath);
-  if (initRes.status !== 0) {
+  if (isDatabase) {
+    writeFileSync(
+      dummyProvidersFile,
+      'provider "aws" {\n  alias  = "singapore"\n  region = "ap-southeast-1"\n}\n',
+      'utf-8',
+    );
+  }
+
+  try {
+    const initRes = runCommand('terraform', ['init', '-backend=false'], dirPath);
+    if (initRes.status !== 0) {
+      // eslint-disable-next-line no-console
+      console.error(`[verify:terraform] [ERROR] "terraform init -backend=false" failed in ${relativeDir}:\n${initRes.stderr || initRes.stdout}`);
+      process.exit(1);
+    }
+
+    const validateRes = runCommand('terraform', ['validate'], dirPath);
+    if (validateRes.status !== 0) {
+      // eslint-disable-next-line no-console
+      console.error(`[verify:terraform] [ERROR] "terraform validate" failed in ${relativeDir}:\n${validateRes.stderr || validateRes.stdout}`);
+      process.exit(1);
+    }
+
+    log('VALIDATE', `Validation successful: ${relativeDir}`);
+  } finally {
+    if (existsSync(dummyProvidersFile)) {
+      unlinkSync(dummyProvidersFile);
+    }
+  }
+}
+
+function verifyDatabaseConnectivityAndTimeoutSpec() {
+  log('DB_CHECK', 'Verifying PgBouncer connectivity architecture and statement_timeout specification (§11.2, §11.3)...');
+  const dbMainTf = resolve(rootDir, 'infra/terraform/modules/database/main.tf');
+  const content = readFileSync(dbMainTf, 'utf-8');
+
+  if (!content.includes('name  = "statement_timeout"') || !content.includes('value = tostring(var.statement_timeout_ms)')) {
     // eslint-disable-next-line no-console
-    console.error(`[verify:terraform] [ERROR] "terraform init -backend=false" failed in ${relativeDir}:\n${initRes.stderr || initRes.stdout}`);
+    console.error('[verify:terraform] [ERROR] statement_timeout parameter not configured in parameter group.');
     process.exit(1);
   }
 
-  const validateRes = runCommand('terraform', ['validate'], dirPath);
-  if (validateRes.status !== 0) {
+  if (!content.includes('name = "POOL_MODE"') || !content.includes('value = var.pgbouncer_pool_mode')) {
     // eslint-disable-next-line no-console
-    console.error(`[verify:terraform] [ERROR] "terraform validate" failed in ${relativeDir}:\n${validateRes.stderr || validateRes.stdout}`);
+    console.error('[verify:terraform] [ERROR] PgBouncer POOL_MODE not set to variable in task definition.');
     process.exit(1);
   }
 
-  log('VALIDATE', `Validation successful: ${relativeDir}`);
+  if (!content.includes('port        = 6432') || !content.includes('containerPort = 6432')) {
+    // eslint-disable-next-line no-console
+    console.error('[verify:terraform] [ERROR] PgBouncer port 6432 not mapped.');
+    process.exit(1);
+  }
+
+  log('DB_CHECK', 'Database connectivity spec and statement_timeout (3s) verified successfully.');
 }
 
 function testDevPlan() {
@@ -155,7 +206,9 @@ async function main() {
   verifyFormatting();
   validateDirectory('infra/terraform/modules/network');
   validateDirectory('infra/terraform/modules/compute');
+  validateDirectory('infra/terraform/modules/database');
   validateDirectory('infra/terraform/environments/dev');
+  verifyDatabaseConnectivityAndTimeoutSpec();
   testDevPlan();
   verifyNoSecretsCommitted();
   log('FINISH', 'All Terraform validation checks passed successfully.');

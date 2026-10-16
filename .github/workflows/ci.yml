@@ -40,6 +40,9 @@ jobs:
       - name: Lint TypeScript (ESLint)
         run: pnpm run lint:ts
 
+      - name: Verify documentation templates
+        run: pnpm run verify:docs
+
       - name: Run unit tests
         run: pnpm test
 

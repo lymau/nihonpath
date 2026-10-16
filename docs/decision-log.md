@@ -2,6 +2,33 @@
 
 Dokumen pencatatan keputusan teknis dan arsitektural proyek NihonPath (format: tanggal, konteks, keputusan, alasan) sesuai standar §0 Aturan 1.
 
+## Panduan Implementer (§0 Aturan 1 & 8)
+
+Dokumen ini adalah **sumber kebenaran tunggal** (*single source of truth*) untuk keputusan teknis dan arsitektur proyek NihonPath. Seluruh engineer dan model implementer wajib mematuhi panduan berikut:
+
+1. **Pencatatan Keputusan & Asumsi (§0 Aturan 1):**
+   - Jika ada hal yang ambigu dalam spesifikasi teknis, pilih opsi paling sederhana yang konsisten dengan dokumen rancangan.
+   - **Setiap asumsi, pemilihan pendekatan teknis baru, atau modifikasi arsitektur WAJIB dicatat di dokumen ini.**
+   - Dilarang keras mengubah arsitektur atau menambahkan dependensi secara diam-diam (*no silent architectural drift*).
+2. **Kewajiban Pencatatan Opsi B / Fallback (§0 Aturan 8):**
+   - Jika spesifikasi teknis utama tidak dapat dipenuhi (misalnya pustaka tidak tersedia/kompatibel, keterbatasan platform, dsb.), implementer **DILARANG berimprovisasi diam-diam**.
+   - Implementer WAJIB:
+     1. Menggunakan **opsi B** yang sudah disiapkan di dokumen rancangan teknis, ATAU
+     2. Mencatat *blocker* dan justifikasi pemilihan alternatif di decision log sebelum mengeksekusi, ATAU
+     3. Mencatat *blocker* di decision log dan beralih mengerjakan task lain.
+3. **Format Baku Entri:**
+   Setiap entri keputusan wajib menggunakan struktur persis berikut:
+   ```markdown
+   ## YYYY-MM-DD — [Task-ID] Judul Keputusan
+
+   - **Tanggal:** YYYY-MM-DD
+   - **Konteks:** Latar belakang masalah, kebutuhan fitur/arsitektur, dan referensi pasal (§...).
+   - **Keputusan:**
+     1. Rincian keputusan teknis konkret yang diambil (termasuk opsi B jika relevan).
+   - **Alasan:**
+     - Justifikasi mengapa opsi ini dipilih dibanding alternatif lain serta kepatuhan DoD.
+   ```
+
 ---
 
 ## 2026-10-11 — [M0-1] Monorepo Tooling, Linter, Formatter & CI Kerangka
@@ -179,5 +206,23 @@ Dokumen pencatatan keputusan teknis dan arsitektural proyek NihonPath (format: t
   - Memastikan distribusi konten kurikulum dan audio pra-render optimal, terlindungi dari scraping tidak sah, siap menangani paket premium berbayar, dan kredensial sensitif terisolasi dengan enkripsi KMS berotasi otomatis.
   - Memenuhi seluruh kriteria Definition of Done (DoD) milestone M0-4c dan batasan arsitektur §0, §4.2, §8.2, §8.3, §9.3, §10, §11.4, §12.1, §13, dan §14.
 
+---
 
+## 2026-10-16 — [M0-5] Template Standard Dokumentasi Teknis: Decision Log, ADR, dan Runbook
 
+- **Tanggal:** 2026-10-16
+- **Konteks:** Standarisasi dokumentasi teknis, Architecture Decision Record (ADR), dan operational runbook untuk menjamin tata kelola arsitektur, penanganan insiden, dan penelusuran keputusan teknis (§0 Aturan 1 & 8, §10.7, §14.1).
+- **Keputusan:**
+  1. **Format & Panduan Decision Log (`docs/decision-log.md`):**
+     - Membakukan format baku: Tanggal, Konteks, Keputusan, Alasan sesuai mandat §0 Aturan 1.
+     - Menegaskan kewajiban pencatatan asumsi dan pemilihan opsi B (§0 Aturan 8) tanpa improvisasi diam-diam.
+  2. **Template Architecture Decision Record (`docs/adr/0000-template.md`):**
+     - Menyusun template ADR dengan 4 bagian wajib: Konteks, Pilihan Keputusan, Keputusan Terpilih, Konsekuensi (positif, negatif, kompromi) serta metadata status siklus hidup keputusan.
+  3. **Template Runbook Operasional (`docs/runbooks/TEMPLATE.md`):**
+     - Menyusun template runbook insiden dengan struktur wajib §10.7: Dampak (SLO/SLI, user), Diagnosis 5 langkah terstruktur, Mitigasi darurat, dan Eskalasi/Incident Commander (SEV1–SEV4), dilengkapi pedoman postmortem 5 hari kerja tanpa menyalahkan.
+  4. **Automasi Validasi Kepatuhan (`tests/docs-templates.test.mjs` & `scripts/verify-docs.mjs`):**
+     - Menambahkan script verifikasi dan unit test untuk memvalidasi keberadaan ketiga file template dan memeriksa kepatuhan struktur format dokumen terhadap aturan §0 dan §10.7.
+- **Alasan:**
+  - Menghindari silent architectural drift dan ketidaksinkronan arsitektur antar kontributor atau implementer AI.
+  - Memberikan panduan diagnosis insiden 5 langkah yang terstruktur untuk menekan MTTR saat alert operasional menyala.
+  - Memenuhi seluruh kriteria Definition of Done (DoD) milestone M0-5 dan aturan dokumen §0, §10.7, dan §14.1.

@@ -26,7 +26,8 @@
     "docker:verify": "node scripts/verify-local-env.mjs",
     "terraform:fmt": "terraform fmt -recursive infra/terraform",
     "terraform:fmt:check": "terraform fmt -check -recursive infra/terraform",
-    "terraform:verify": "node scripts/verify-terraform.mjs"
+    "terraform:verify": "node scripts/verify-terraform.mjs",
+    "verify:docs": "node scripts/verify-docs.mjs"
   },
   "lint-staged": {
     "*.{ts,js,mjs,cjs}": [

@@ -139,5 +139,45 @@ Dokumen pencatatan keputusan teknis dan arsitektural proyek NihonPath (format: t
   - Menjamin arsitektur database dev robust, highly available (Multi-AZ), siap menangani beban konkurensi dengan PgBouncer pooling, dan terlindungi dari bencana sesuai standar SLA/RPO/RTO §11.
   - Memenuhi seluruh kriteria Definition of Done (DoD) milestone M0-4b dan batasan arsitektur §0, §4.2, §11.2, §11.3, §11.4, §12.1, dan §14.
 
+---
+
+## 2026-10-16 — [M0-4c] Terraform Storage, CDN & Secret Management Dev
+
+- **Tanggal:** 2026-10-16
+- **Konteks:** Penyusunan modul Terraform untuk Object Storage paket konten dan audio pra-render, CDN CloudFront dengan Origin Access Control (OAC), mekanisme presigned URL & CloudFront signed URL, serta Secret Manager & KMS di environment dev (§4.2, §8.2, §8.3, §9.3, §11.4, §12.1, §13, §14.1, §14.2).
+- **Keputusan:**
+  1. **Object Storage S3 (`infra/terraform/modules/storage`):**
+     - Menyediakan dua bucket terdedikasi: `${name_prefix}-${environment}-packs` untuk content packs dan `${name_prefix}-${environment}-audio` untuk audio pra-render.
+     - Versioning wajib aktif (`status = "Enabled"`) pada kedua bucket sesuai ketentuan §11.4.
+     - Server-side encryption default (AES256) dan pemblokiran total akses publik via `aws_s3_bucket_public_access_block` (`block_public_acls = true`, `block_public_policy = true`, `ignore_public_acls = true`, `restrict_public_buckets = true`) untuk memastikan file privat tidak bisa diakses publik secara langsung (§12.1).
+     - Konfigurasi CORS dengan exposure header `Content-Range`, `ETag`, `Content-Length` untuk mendukung resumable download (HTTP Range) sesuai spesifikasi §9.3.
+     - Menyediakan IAM policy `presigned_url_access` untuk backend API dalam meng-generate presigned URL unduhan konten premium (§8.2, §12.1).
+  2. **CDN AWS CloudFront dengan OAC (`infra/terraform/modules/cdn`):**
+     - Menggunakan AWS CloudFront terhubung ke bucket S3 origin via Origin Access Control (OAC - SigV4) tanpa mengekspos bucket S3 ke internet publik.
+     - Aturan caching read-mostly: metode HTTP yang diizinkan `GET, HEAD, OPTIONS`, metode yang di-cache `GET, HEAD`, kompresi otomatis (gzip/brotli), dan viewer redirect ke HTTPS (protokol minimum TLS 1.2).
+     - Mekanisme signed URL untuk paket premium via `aws_cloudfront_public_key` dan `aws_cloudfront_key_group` yang ditegakkan pada ordered cache behavior path `/premium/*` (§8.2, §12.1).
+     - Cache behavior `/audio/*` dengan TTL panjang (default 30 hari) untuk file audio pra-render yang bersifat immutable.
+     - Konfigurasi kebijakan bucket S3 (`aws_s3_bucket_policy`) yang membatasi hak akses baca `s3:GetObject` hanya untuk CloudFront distribution ARN melalui OAC.
+  3. **Manajemen Kunci KMS & Secrets Manager (`infra/terraform/modules/secrets`):**
+     - Customer Managed KMS Key dengan rotasi otomatis aktif (`enable_key_rotation = true`) untuk enkripsi kredensial aplikasi (§12.1).
+     - Secret Manager untuk kunci penandatanganan JWT (`jwt_signing_key`): payload JSON terstruktur dengan `kid`, algoritma (ES256), public key, dan private key untuk mendukung rotasi kunci JWT (§8.3).
+     - Secret Manager untuk third-party API keys (`third_party_api_keys`): kredensial provider email (SES/Postmark), RevenueCat webhook shared secret (§13), dan Google/Apple OIDC client secret (§8.2).
+     - Secret Manager untuk CloudFront private signing key yang dipakai API backend untuk menandatangani URL paket premium.
+     - Menyediakan IAM policy `secrets_read_access` untuk ECS task role backend API.
+  4. **Observability & Logging CDN (§10, M0-4c):**
+     - Dedicated access logs S3 bucket (`${name_prefix}-${environment}-cdn-logs`) dengan versioning, SSE, dan ownership controls untuk logging kode status HTTP CDN.
+     - CloudWatch Metric Alarms untuk memantau error rate CDN: `5xxErrorRate` (> 5%) dan `4xxErrorRate` (> 10%) per interval 5 menit.
+  5. **Integrasi Lingkungan Dev (`infra/terraform/environments/dev`):**
+     - Menghubungkan modul storage, cdn, dan secrets ke dalam dev stack.
+     - Menempelkan IAM policy presigned URL dan secrets read access ke API task role.
+     - Menginjeksikan environment variables (`STORAGE_PACKS_BUCKET`, `STORAGE_AUDIO_BUCKET`, `CDN_DOMAIN`, `JWT_SECRET_ARN`, `THIRD_PARTY_SECRETS_ARN`) ke compute API dan Worker.
+     - Mengekspor seluruh output esensial pada `outputs.tf`.
+  6. **Tooling & Verifikasi Otomatis:**
+     - Memperbarui `scripts/verify-terraform.mjs` untuk memvalidasi format, modul storage, cdn, secrets, spesifikasi kepatuhan arsitektur, dan eksekusi dev plan (109 resource).
+     - Menambahkan 6 test suite baru di `tests/terraform.test.mjs`, termasuk simulasi izin bucket privat yang memverifikasi bahwa akses langsung tanpa CDN/presigned URL ditolak 403 Forbidden sedangkan akses dengan OAC / presigned URL diizinkan 200 OK.
+- **Alasan:**
+  - Memastikan distribusi konten kurikulum dan audio pra-render optimal, terlindungi dari scraping tidak sah, siap menangani paket premium berbayar, dan kredensial sensitif terisolasi dengan enkripsi KMS berotasi otomatis.
+  - Memenuhi seluruh kriteria Definition of Done (DoD) milestone M0-4c dan batasan arsitektur §0, §4.2, §8.2, §8.3, §9.3, §10, §11.4, §12.1, §13, dan §14.
+
 
 

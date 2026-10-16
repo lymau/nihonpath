@@ -18,4 +18,6 @@ backup_retention_days   = 14
 pgbouncer_pool_mode     = "transaction"
 redis_engine_version    = "7.1"
 redis_node_type         = "cache.t4g.micro"
+cloudfront_price_class  = "PriceClass_100"
+jwt_algorithm           = "ES256"
 

@@ -98,3 +98,58 @@ output "redis_secret_arn" {
   value       = module.database.redis_secret_arn
 }
 
+output "content_packs_bucket_id" {
+  description = "Name/ID of content packs S3 bucket"
+  value       = module.storage.content_packs_bucket_id
+}
+
+output "content_packs_bucket_arn" {
+  description = "ARN of content packs S3 bucket"
+  value       = module.storage.content_packs_bucket_arn
+}
+
+output "audio_bucket_id" {
+  description = "Name/ID of audio S3 bucket"
+  value       = module.storage.audio_bucket_id
+}
+
+output "audio_bucket_arn" {
+  description = "ARN of audio S3 bucket"
+  value       = module.storage.audio_bucket_arn
+}
+
+output "cloudfront_distribution_id" {
+  description = "ID of CloudFront distribution"
+  value       = module.cdn.cloudfront_distribution_id
+}
+
+output "cloudfront_distribution_domain_name" {
+  description = "Domain name of CloudFront distribution"
+  value       = module.cdn.cloudfront_distribution_domain_name
+}
+
+output "cloudfront_key_group_id" {
+  description = "ID of CloudFront key group for signed URLs"
+  value       = module.cdn.cloudfront_key_group_id
+}
+
+output "cdn_logs_bucket_id" {
+  description = "S3 bucket name for CDN access logs"
+  value       = module.cdn.logs_bucket_id
+}
+
+output "secrets_kms_key_arn" {
+  description = "ARN of KMS CMK for secret encryption"
+  value       = module.secrets.kms_key_arn
+}
+
+output "jwt_signing_key_secret_arn" {
+  description = "ARN of Secret Manager secret for JWT signing keys"
+  value       = module.secrets.jwt_signing_key_secret_arn
+}
+
+output "third_party_api_keys_secret_arn" {
+  description = "ARN of Secret Manager secret for third-party API keys"
+  value       = module.secrets.third_party_api_keys_secret_arn
+}
+

@@ -214,6 +214,83 @@ variable "redis_node_type" {
   default     = "cache.t4g.micro"
 }
 
+variable "content_packs_bucket_name" {
+  description = "Custom name for content packs S3 bucket (leave empty for default)"
+  type        = string
+  default     = ""
+}
+
+variable "audio_bucket_name" {
+  description = "Custom name for pre-rendered audio S3 bucket (leave empty for default)"
+  type        = string
+  default     = ""
+}
+
+variable "cors_allowed_origins" {
+  description = "Allowed origins for storage CORS"
+  type        = list(string)
+  default     = ["*"]
+}
+
+variable "cloudfront_price_class" {
+  description = "CloudFront distribution price class"
+  type        = string
+  default     = "PriceClass_100"
+}
+
+variable "jwt_key_id" {
+  description = "JWT key identifier (kid) supporting rotation (§8.3)"
+  type        = string
+  default     = "nihonpath-dev-jwt-v1"
+}
+
+variable "jwt_algorithm" {
+  description = "JWT signing algorithm (ES256 or EdDSA §8.3)"
+  type        = string
+  default     = "ES256"
+}
+
+variable "jwt_private_key_pem" {
+  description = "Private key PEM for JWT signing"
+  type        = string
+  sensitive   = true
+  default     = "placeholder-jwt-private-key-for-dev"
+}
+
+variable "jwt_public_key_pem" {
+  description = "Public key PEM for JWT verification (JWKS §8.3)"
+  type        = string
+  default     = "placeholder-jwt-public-key-for-dev"
+}
+
+variable "revenuecat_webhook_secret" {
+  description = "RevenueCat webhook authorization secret (§13)"
+  type        = string
+  sensitive   = true
+  default     = "placeholder-revenuecat-webhook-secret-dev"
+}
+
+variable "email_provider_api_key" {
+  description = "Transactional email provider API key (§8.3)"
+  type        = string
+  sensitive   = true
+  default     = "placeholder-email-provider-key-dev"
+}
+
+variable "google_oidc_client_secret" {
+  description = "Google OIDC client secret (§8.2)"
+  type        = string
+  sensitive   = true
+  default     = "placeholder-google-oidc-secret-dev"
+}
+
+variable "apple_oidc_client_secret" {
+  description = "Apple OIDC client secret (§8.2)"
+  type        = string
+  sensitive   = true
+  default     = "placeholder-apple-oidc-secret-dev"
+}
+
 variable "tags" {
   description = "Additional tags"
   type        = map(string)

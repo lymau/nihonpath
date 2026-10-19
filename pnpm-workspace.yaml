@@ -5,4 +5,6 @@ packages:
 
 allowBuilds:
   '@openapitools/openapi-generator-cli': true
+  cpu-features: true
   'protobufjs': true
+  ssh2: true

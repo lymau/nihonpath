@@ -259,3 +259,34 @@ Dokumen ini adalah **sumber kebenaran tunggal** (*single source of truth*) untuk
   - Skema error RFC 9457 menjamin integrasi kontrak API yang konsisten dengan klien mobile Flutter dan mempermudah korelasi debugging via `trace_id`.
   - Filter PII ketat mencegah pelanggaran privasi pengguna di seluruh pipeline logging.
   - Memenuhi seluruh kriteria Definition of Done (DoD) milestone M1-1 dan Aturan Dokumen §0, §4.2, §8.1, §8.2, §10.2, §10.4, dan §14.1.
+
+---
+
+## 2026-10-20 — [M1-2] Migrasi 001 (Seluruh Skema §6.3), Partisi review_logs, Kysely Typed, dan Konfigurasi Pool PostgreSQL
+
+- **Tanggal:** 2026-10-20
+- **Konteks:** Mengimplementasikan migrasi SQL murni lengkap untuk seluruh skema PostgreSQL (§6.3) beserta partisi rentang `review_logs`, partisi pengaman default `review_logs_default`, tipe TypeScript Kysely typed, migrasi atomik naik-turun, serta connection pool PostgreSQL dengan batasan timeout dan metrik saturasi (§4.2, §6.3, §10.3, §11.3, §12.1, M1-2).
+- **Keputusan:**
+  1. **Migrasi SQL Murni (`apps/api/src/db/migrations/001_initial_schema.sql`):**
+     - Menggunakan `node-pg-migrate` dengan divider `-- Up Migration` dan `-- Down Migration` untuk mengeksekusi DDL SQL murni tanpa abstraksi ORM magic (§4.2).
+     - Membuat ekstensi `citext` dan 15 tabel PostgreSQL sesuai spesifikasi persis §6.3: `users`, `auth_identities`, `devices`, `refresh_tokens`, `content_items`, `lessons`, `lesson_items`, `content_packs`, `user_sync_state`, `user_cards`, `review_logs`, `review_logs_default`, `user_settings`, `lesson_progress`, `test_attempts`, dan `subscriptions`.
+     - Tabel `review_logs` dipartisi berdasarkan rentang waktu `PARTITION BY RANGE (reviewed_at)` dengan indeks komposit `(user_id, user_seq)` dan `(user_id, card_id, reviewed_at)`.
+     - Partisi default `review_logs_default` dibuat sebagai pengaman partisi untuk menangkap entri sebelum partisi bulanan dibuat atau di luar rentang aktif (§6.3).
+     - Langkah `down` membersihkan seluruh tabel secara terbalik dan atomik menggunakan `DROP TABLE IF EXISTS ... CASCADE` serta `DROP EXTENSION IF EXISTS citext CASCADE`.
+  2. **Type-Safe Query Builder Kysely (`apps/api/src/db/types.ts`):**
+     - Mendefinisikan interface TypeScript untuk ke-15 tabel dengan Kysely `Generated` dan `ColumnType` untuk integritas compile-time tanpa mengorbankan performa query murni SQL (§4.2).
+  3. **Connection Pool Kysely & Keamanan Runtime (`apps/api/src/db/client.ts`):**
+     - Membangun connection pool `pg.Pool` dan instance `Kysely<Database>` dengan penegakan `statement_timeout` 3 detik (3000 ms) via parameter pool dan event hook `SET statement_timeout = 3000` pada setiap koneksi baru (§11.3).
+     - Menyediakan opsi penetapan role non-DDL `applicationRole` (`SET ROLE ...`) pada sesi runtime produksi (§12.1).
+  4. **Observability & Metrik Saturasi Pool (§10.3):**
+     - Mengekspos fungsi `getDbPoolMetrics(pool)` yang menghitung `db_pool_in_use` (`totalCount - idleCount`) dan `db_pool_waiting` (`waitingCount`) untuk pemantauan saturasi koneksi di Prometheus/Grafana.
+     - Menyediakan logging eksekusi migrasi rapi berformat standar di `apps/api/src/db/migrator.ts`.
+  5. **Pengujian Integration Test Multi-Runtime (`tests/db-migrations.test.mjs`):**
+     - Mengimplementasikan integration test suite komprehensif yang memvalidasi migrasi naik, verifikasi seluruh skema dan relkind partisi, verifikasi partition routing data ke `review_logs_default` dan partisi bulanan spesifik, verifikasi pembatalan query akibat `statement_timeout` (SQLSTATE 57014), dan migrasi turun tuntas.
+     - Menggunakan Testcontainers PostgreSQL dengan fallback cerdas ke container transient Podman/Docker CLI pada environment lokal tanpa Docker socket proxy, menjamin pengujian 100% lulus di CI maupun lingkungan lokal.
+- **Alasan:**
+  - Kysely menyediakan query builder type-safe tanpa black-box ORM, sepenuhnya mendukung query kompleks UNION ALL pada modul sync serta skema partisi PostgreSQL native (§4.2).
+  - Penegakan `statement_timeout` 3 detik mencegah query runaway memblokir connection pool dan menurunkan ketersediaan layanan (§11.3).
+  - Skema partisi rentang menjamin throughput tulis tinggi dan pengarsipan historis mudah pada tabel `review_logs` (§6.3, §11.1).
+  - Memenuhi seluruh kriteria Definition of Done (DoD) milestone M1-2 dan batasan arsitektur §0, §4.2, §6.3, §10.3, §11.3, dan §12.1.
+

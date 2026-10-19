@@ -5,3 +5,4 @@ packages:
 
 allowBuilds:
   '@openapitools/openapi-generator-cli': true
+  'protobufjs': true

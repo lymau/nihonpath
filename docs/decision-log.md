@@ -226,3 +226,36 @@ Dokumen ini adalah **sumber kebenaran tunggal** (*single source of truth*) untuk
   - Menghindari silent architectural drift dan ketidaksinkronan arsitektur antar kontributor atau implementer AI.
   - Memberikan panduan diagnosis insiden 5 langkah yang terstruktur untuk menekan MTTR saat alert operasional menyala.
   - Memenuhi seluruh kriteria Definition of Done (DoD) milestone M0-5 dan aturan dokumen §0, §10.7, dan §14.1.
+
+---
+
+## 2026-10-19 — [M1-1] Kerangka Backend NestJS: Config Tervalidasi Zod, Pino Logger Tanpa PII, OpenTelemetry, RFC 9457 Filter, Health Checks & Clock
+
+- **Tanggal:** 2026-10-19
+- **Konteks:** Inisialisasi dan penyusunan kerangka backend API NestJS dengan adapter Fastify, konfigurasi tervalidasi Zod, logging JSON Pino tanpa PII, OpenTelemetry tracing dan W3C traceparent context, error filter RFC 9457 application/problem+json, health endpoints (/healthz, /readyz), dan penyediaan provider abstraksi Clock (§0 Aturan 5, §4.2, §8.1, §8.2, §10.2, §10.4, §14.1, M1-1).
+- **Keputusan:**
+  1. **NestJS dengan Fastify Adapter (`apps/api`):**
+     - Menggunakan NestJS dengan Fastify adapter (`@nestjs/platform-fastify` & `fastify`) untuk throughput maksimal dan latensi rendah pada endpoint API backend.
+  2. **12-Factor Config dengan Zod Schema (`src/common/config`):**
+     - Mengimplementasikan `EnvSchema` dengan Zod untuk validasi ketat env var startup (`NODE_ENV`, `PORT`, `HOST`, `DATABASE_URL`, `REDIS_URL`, `USER_HASH_SECRET`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `CORS_ORIGIN`).
+     - Melempar `ConfigValidationError` deskriptif saat konfigurasi wajib hilang atau tidak memenuhi standar keamanan.
+  3. **Pino Logger JSON Satu Baris & Penyaring PII Ketat (`src/common/logging`):**
+     - Membangun `PinoLoggerService` dan `LoggingInterceptor` yang secara deterministik menghasilkan log JSON satu baris dengan 12 field wajib §10.2: `ts`, `level`, `service`, `env`, `version`, `trace_id`, `span_id`, `route`, `status`, `latency_ms`, `error_code`, `user_hash`.
+     - `user_hash` dihasilkan via HMAC-SHA256 dari `user_id` dengan rahasia `USER_HASH_SECRET`.
+     - Menerapkan fungsi sanitasi rekursif `sanitizeLogData` dan `sanitizeIp` yang memotong IP ke subnet /24 (IPv4) atau /48 (IPv6) serta mereduksi token, email, password, kode OTP, jawaban bebas/teks, dan meringkas payload sync (`ops`).
+  4. **OpenTelemetry SDK & Propagasi W3C Trace Context (`src/common/telemetry`):**
+     - Mengintegrasikan NodeSDK dengan auto-instrumentation HTTP, pg, dan ioredis.
+     - Menyediakan utilitas parser W3C `traceparent` (`00-{trace_id}-{span_id}-{flags}`) dan resolver trace context terdistribusi yang menyematkan `X-Trace-Id` pada header respon HTTP.
+  5. **Global Exception Filter RFC 9457 Problem Details (`src/common/errors`):**
+     - Menerapkan `Rfc9457ExceptionFilter` global dengan header `Content-Type: application/problem+json; charset=utf-8`.
+     - Memformat seluruh kegagalan (AppException, ZodError validasi, HttpException, error tak terduga) ke schema RFC 9457 dengan ekstensi wajib `code` dan `trace_id`.
+  6. **Endpoint Operasional Health Check (`src/modules/health`):**
+     - `GET /healthz`: liveness probe cepat mengembalikan 200 OK dan timestamp UTC.
+     - `GET /readyz`: readiness probe yang memeriksa koneksi DB (`SELECT 1`) dan Redis (`PING`), mengembalikan 200 OK jika keduanya up dan 503 Service Unavailable jika salah satu down.
+  7. **Abstraksi Waktu UTC `Clock` (`src/common/clock`):**
+     - Menyediakan interface `Clock` dan provider `SystemClock` untuk seluruh logika bisnis guna mematuhi larangan pemanggilan `Date.now()` langsung (§0 Aturan 5), serta `MockClock` untuk unit testing deterministik.
+- **Alasan:**
+  - Fastify adapter menawarkan efisiensi I/O tinggi untuk target throughput dan latensi server NihonPath (p95 < 500 ms).
+  - Skema error RFC 9457 menjamin integrasi kontrak API yang konsisten dengan klien mobile Flutter dan mempermudah korelasi debugging via `trace_id`.
+  - Filter PII ketat mencegah pelanggaran privasi pengguna di seluruh pipeline logging.
+  - Memenuhi seluruh kriteria Definition of Done (DoD) milestone M1-1 dan Aturan Dokumen §0, §4.2, §8.1, §8.2, §10.2, §10.4, dan §14.1.

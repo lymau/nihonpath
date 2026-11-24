@@ -290,3 +290,14 @@ Dokumen ini adalah **sumber kebenaran tunggal** (*single source of truth*) untuk
   - Skema partisi rentang menjamin throughput tulis tinggi dan pengarsipan historis mudah pada tabel `review_logs` (§6.3, §11.1).
   - Memenuhi seluruh kriteria Definition of Done (DoD) milestone M1-2 dan batasan arsitektur §0, §4.2, §6.3, §10.3, §11.3, dan §12.1.
 
+---
+
+## 2026-11-24 — [M1-3] Guest Auth, Refresh Token Rotation, Reuse Detection, dan JWKS
+
+- **Tanggal:** 2026-11-24
+- **Konteks:** Implementasi sesi guest di API, refresh-token berotasi dan dicabut per-family saat reuse, logout perangkat, serta publikasi JWKS ES256.
+- **Keputusan:**
+  1. Kunci ES256 P-256 disediakan melalui `AUTH_JWT_PRIVATE_KEY` dan `AUTH_JWT_KEY_ID`; JWKS diturunkan dari public key agar private material tidak pernah dipublikasikan.
+  2. Refresh token dibuat dari 32 byte acak, hanya hash SHA-256 yang disimpan, dan perubahan token dijalankan dalam transaksi dengan row lock untuk mencegah rotasi bersamaan.
+  3. Metrik autentikasi dibuat melalui OpenTelemetry API dan dikirim sebagai OTLP metrics bila `OTEL_EXPORTER_OTLP_ENDPOINT` dikonfigurasi.
+- **Alasan:** Menegakkan batas masa berlaku dan kontrol anti-reuse pada sisi server, sambil menggunakan konfigurasi rahasia runtime dan pipeline observability yang telah tersedia.

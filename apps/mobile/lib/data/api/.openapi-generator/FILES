@@ -12,7 +12,10 @@ doc/ContentPackKind.md
 doc/ErrorCode.md
 doc/GuestAuthRequest.md
 doc/InvalidParam.md
+doc/JsonWebKey.md
+doc/JwksResponse.md
 doc/ProblemDetails.md
+doc/RefreshTokenRequest.md
 doc/SyncApi.md
 doc/SyncChange.md
 doc/SyncEntityName.md
@@ -45,7 +48,10 @@ lib/src/model/date.dart
 lib/src/model/error_code.dart
 lib/src/model/guest_auth_request.dart
 lib/src/model/invalid_param.dart
+lib/src/model/json_web_key.dart
+lib/src/model/jwks_response.dart
 lib/src/model/problem_details.dart
+lib/src/model/refresh_token_request.dart
 lib/src/model/sync_change.dart
 lib/src/model/sync_entity_name.dart
 lib/src/model/sync_op_result.dart

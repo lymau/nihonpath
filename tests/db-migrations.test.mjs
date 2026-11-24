@@ -4,6 +4,7 @@ import { spawnSync, execSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import { createHash, generateKeyPairSync } from 'node:crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -402,6 +403,144 @@ test('PostgreSQL Migrations & Kysely Typed Schema (§4.2, §6.3, §10.3, §11.3,
         }
       },
     );
+
+    await t.test('Auth guest, rotasi refresh, reuse detection, dan logout', async () => {
+      const { AuthService } = await import('../apps/api/dist/modules/auth/auth.service.js');
+      const { AuthTokenService } =
+        await import('../apps/api/dist/modules/auth/auth-token.service.js');
+      const privateKey = generateKeyPairSync('ec', {
+        namedCurve: 'prime256v1',
+      })
+        .privateKey.export({ type: 'pkcs8', format: 'pem' })
+        .toString();
+      const tokenService = new AuthTokenService({
+        get(key) {
+          return {
+            AUTH_JWT_PRIVATE_KEY: privateKey,
+            AUTH_JWT_KEY_ID: 'integration-test-key',
+          }[key];
+        },
+      });
+      const clock = { now: () => new Date('2026-10-19T12:00:00.000Z') };
+      let reuseMetrics = 0;
+      let loginSuccesses = 0;
+      let loginFailures = 0;
+      const authService = new AuthService(
+        { db },
+        tokenService,
+        {
+          recordGuestLogin(result) {
+            if (result === 'success') loginSuccesses += 1;
+            else loginFailures += 1;
+          },
+          recordRefreshReuse() {
+            reuseMetrics += 1;
+          },
+        },
+        { log() {} },
+        clock,
+      );
+
+      const guest = await authService.createGuest({
+        device_id: '0192a000-0000-7000-8000-000000000011',
+        platform: 'android',
+      });
+      assert.equal(guest.expires_in, 900);
+      assert.match(guest.refresh_token, /^[A-Za-z0-9_-]{43}$/);
+      const guestUser = await db
+        .selectFrom('users')
+        .select(['id', 'is_guest'])
+        .where('id', '=', guest.user_id)
+        .executeTakeFirstOrThrow();
+      assert.equal(guestUser.is_guest, true);
+      const guestDevice = await db
+        .selectFrom('devices')
+        .select(['id', 'user_id'])
+        .where('id', '=', '0192a000-0000-7000-8000-000000000011')
+        .executeTakeFirstOrThrow();
+      assert.equal(guestDevice.user_id, guest.user_id);
+      assert.equal(loginSuccesses, 1);
+
+      const initialHash = createHash('sha256').update(guest.refresh_token).digest();
+      const initialToken = await db
+        .selectFrom('refresh_tokens')
+        .selectAll()
+        .where('token_hash', '=', initialHash)
+        .executeTakeFirstOrThrow();
+      assert.notEqual(initialToken.token_hash.toString(), guest.refresh_token);
+      assert.equal(
+        new Date(initialToken.expires_at).getTime() - clock.now().getTime(),
+        30 * 24 * 60 * 60 * 1000,
+      );
+
+      const rotated = await authService.refresh(guest.refresh_token);
+      assert.notEqual(rotated.refresh_token, guest.refresh_token);
+      const rotatedAgain = await authService.refresh(rotated.refresh_token);
+      await assert.rejects(
+        authService.refresh(guest.refresh_token),
+        (error) => error.code === 'AUTH_REFRESH_REUSED',
+      );
+      const familyRows = await db
+        .selectFrom('refresh_tokens')
+        .select(['revoked_at', 'replaced_by'])
+        .where('family_id', '=', initialToken.family_id)
+        .execute();
+      assert.equal(familyRows.length, 3);
+      assert.ok(familyRows.every((row) => row.revoked_at !== null));
+      assert.ok(familyRows[0].replaced_by);
+      assert.equal(reuseMetrics, 1);
+      await assert.rejects(
+        authService.refresh(rotatedAgain.refresh_token),
+        (error) => error.code === 'AUTH_REFRESH_REUSED',
+      );
+
+      const concurrentGuest = await authService.createGuest({
+        device_id: '0192a000-0000-7000-8000-000000000013',
+        platform: 'android',
+      });
+      const concurrentResults = await Promise.allSettled([
+        authService.refresh(concurrentGuest.refresh_token),
+        authService.refresh(concurrentGuest.refresh_token),
+      ]);
+      const concurrentSuccesses = concurrentResults.filter(
+        (result) => result.status === 'fulfilled',
+      );
+      assert.equal(concurrentSuccesses.length, 1);
+      await assert.rejects(
+        authService.refresh(concurrentSuccesses[0].value.refresh_token),
+        (error) => error.code === 'AUTH_REFRESH_REUSED',
+      );
+
+      const logoutGuest = await authService.createGuest({
+        device_id: '0192a000-0000-7000-8000-000000000012',
+        platform: 'ios',
+      });
+      const logoutRotated = await authService.refresh(logoutGuest.refresh_token);
+      await authService.logout(logoutRotated.refresh_token);
+      await assert.rejects(
+        authService.refresh(logoutRotated.refresh_token),
+        (error) => error.code === 'AUTH_REFRESH_REUSED',
+      );
+      const logoutHash = createHash('sha256').update(logoutGuest.refresh_token).digest();
+      const logoutToken = await db
+        .selectFrom('refresh_tokens')
+        .select(['family_id'])
+        .where('token_hash', '=', logoutHash)
+        .executeTakeFirstOrThrow();
+      const loggedOutFamily = await db
+        .selectFrom('refresh_tokens')
+        .select(['revoked_at'])
+        .where('family_id', '=', logoutToken.family_id)
+        .execute();
+      assert.ok(loggedOutFamily.every((row) => row.revoked_at !== null));
+      await assert.rejects(
+        authService.createGuest({
+          device_id: '0192a000-0000-7000-8000-000000000011',
+          platform: 'android',
+        }),
+      );
+      assert.equal(loginFailures, 1);
+    });
 
     // -------------------------------------------------------------------------
     // 3. Database Pool Saturation Metrics & Statement Timeout (§10.3, §11.3, §12.1)

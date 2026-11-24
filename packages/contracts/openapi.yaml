@@ -44,6 +44,72 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerErrorResponse'
 
+  /auth/refresh:
+    post:
+      summary: Rotasi refresh token
+      description: Menerbitkan pasangan token baru dan mencabut refresh token sebelumnya; reuse mencabut seluruh family (§8.3, §12.1).
+      operationId: refreshAuthToken
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Token berhasil dirotasi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerErrorResponse'
+
+  /auth/logout:
+    post:
+      summary: Logout dari perangkat
+      description: Mencabut seluruh refresh token dalam family perangkat berdasarkan refresh token peminta.
+      operationId: logoutAuthDevice
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '204':
+          description: Family token perangkat berhasil dicabut.
+        '400':
+          $ref: '#/components/responses/ProblemResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerErrorResponse'
+
+  /.well-known/jwks.json:
+    get:
+      summary: Ambil JSON Web Key Set untuk verifikasi access token
+      operationId: getAuthJwks
+      servers:
+        - url: /
+      tags:
+        - Auth
+      responses:
+        '200':
+          description: Public key ES256 yang digunakan untuk verifikasi JWT.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JwksResponse'
+
   /config:
     get:
       summary: Ambil konfigurasi aplikasi dan parameter remote
@@ -380,6 +446,64 @@ components:
           description: Tipe otentikasi token
           default: 'Bearer'
           example: 'Bearer'
+
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refresh_token
+      properties:
+        refresh_token:
+          type: string
+          description: Refresh token 256-bit peminta
+          pattern: '^[A-Za-z0-9_-]{43}$'
+          example: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+
+    JwksResponse:
+      type: object
+      required:
+        - keys
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/JsonWebKey'
+
+    JsonWebKey:
+      type: object
+      required:
+        - kty
+        - crv
+        - x
+        - y
+        - use
+        - alg
+        - kid
+        - key_ops
+      properties:
+        kty:
+          type: string
+          example: EC
+        crv:
+          type: string
+          example: P-256
+        x:
+          type: string
+        y:
+          type: string
+        use:
+          type: string
+          example: sig
+        alg:
+          type: string
+          example: ES256
+        kid:
+          type: string
+        key_ops:
+          type: array
+          items:
+            type: string
+          example:
+            - verify
 
     AppConfigResponse:
       type: object

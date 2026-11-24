@@ -5,6 +5,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { createPublicKey, generateKeyPairSync, verify } from 'node:crypto';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter } from '@nestjs/platform-fastify';
 
@@ -13,6 +14,11 @@ const __dirname = dirname(__filename);
 const rootDir = resolve(__dirname, '..');
 const apiDir = resolve(rootDir, 'apps/api');
 const apiDistDir = resolve(apiDir, 'dist');
+const jwtPrivateKey = generateKeyPairSync('ec', {
+  namedCurve: 'prime256v1',
+})
+  .privateKey.export({ type: 'pkcs8', format: 'pem' })
+  .toString();
 
 // Always compile apps/api TypeScript to dist/ to guarantee fresh test artifacts
 const isWindows = process.platform === 'win32';
@@ -33,6 +39,8 @@ const validEnv = {
   DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/nihonpath_test',
   REDIS_URL: 'redis://localhost:6379',
   USER_HASH_SECRET: 'test-super-secret-user-hash-key-32chars!',
+  AUTH_JWT_PRIVATE_KEY: jwtPrivateKey,
+  AUTH_JWT_KEY_ID: 'test-es256-key',
   SERVICE_NAME: 'nihonpath-api-test',
   APP_VERSION: '0.1.0',
   LOG_LEVEL: 'info',
@@ -58,6 +66,8 @@ const { ValidationException, RateLimitedException, Rfc9457ExceptionFilter } =
   await import('../apps/api/dist/common/errors/index.js');
 
 const { AppModule } = await import('../apps/api/dist/app.module.js');
+const { AuthTokenService, ACCESS_TOKEN_TTL_SECONDS } =
+  await import('../apps/api/dist/modules/auth/auth-token.service.js');
 const { DB_HEALTH_CHECKER, REDIS_HEALTH_CHECKER } =
   await import('../apps/api/dist/modules/health/health-indicators.js');
 
@@ -117,6 +127,42 @@ test('Config validation: throws error when mandatory environment variables are m
   assert.equal(parsed.APP_VERSION, '0.1.0');
   assert.equal(parsed.LOG_LEVEL, 'info');
   assert.equal(parsed.CORS_ORIGIN, '*');
+});
+
+test('Auth JWT: ES256 claims and public JWKS verify the access token', () => {
+  const tokenService = new AuthTokenService({
+    get(key) {
+      return validEnv[key];
+    },
+  });
+  const now = new Date('2026-10-19T12:00:00.000Z');
+  const userId = '0192a000-0000-7000-8000-000000000001';
+  const deviceId = '0192a000-0000-7000-8000-000000000002';
+  const token = tokenService.createAccessToken(userId, deviceId, now);
+  const [headerPart, payloadPart, signaturePart] = token.split('.');
+  const header = JSON.parse(Buffer.from(headerPart, 'base64url').toString());
+  const payload = JSON.parse(Buffer.from(payloadPart, 'base64url').toString());
+  const signingInput = `${headerPart}.${payloadPart}`;
+  const jwk = tokenService.jwks().keys[0];
+
+  assert.equal(header.alg, 'ES256');
+  assert.equal(header.kid, validEnv.AUTH_JWT_KEY_ID);
+  assert.equal(payload.sub, userId);
+  assert.equal(payload.device_id, deviceId);
+  assert.equal(payload.exp - payload.iat, ACCESS_TOKEN_TTL_SECONDS);
+  assert.equal(jwk.use, 'sig');
+  assert.equal(jwk.alg, 'ES256');
+  assert.equal(jwk.kid, header.kid);
+  assert.equal('d' in jwk, false, 'JWKS must not contain private key material');
+  assert.equal(
+    verify(
+      'sha256',
+      Buffer.from(signingInput),
+      { key: createPublicKey({ key: jwk, format: 'jwk' }), dsaEncoding: 'ieee-p1363' },
+      Buffer.from(signaturePart, 'base64url'),
+    ),
+    true,
+  );
 });
 
 test('Clock abstraction: provides UTC time and deterministic mocking (§0 Aturan 5, M1-1)', () => {
@@ -374,6 +420,13 @@ test('Integration: GET /healthz and GET /readyz endpoints with Fastify adapter (
   const fastify = app.getHttpAdapter().getInstance();
 
   try {
+    const jwksRes = await fastify.inject({
+      method: 'GET',
+      url: '/.well-known/jwks.json',
+    });
+    assert.equal(jwksRes.statusCode, 200);
+    assert.equal(JSON.parse(jwksRes.payload).keys[0].kid, validEnv.AUTH_JWT_KEY_ID);
+
     // 1. Test GET /healthz (liveness)
     const healthzRes = await fastify.inject({
       method: 'GET',

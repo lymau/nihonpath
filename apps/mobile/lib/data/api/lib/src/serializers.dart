@@ -22,7 +22,10 @@ import 'package:nihonpath_api/src/model/content_pack_kind.dart';
 import 'package:nihonpath_api/src/model/error_code.dart';
 import 'package:nihonpath_api/src/model/guest_auth_request.dart';
 import 'package:nihonpath_api/src/model/invalid_param.dart';
+import 'package:nihonpath_api/src/model/json_web_key.dart';
+import 'package:nihonpath_api/src/model/jwks_response.dart';
 import 'package:nihonpath_api/src/model/problem_details.dart';
+import 'package:nihonpath_api/src/model/refresh_token_request.dart';
 import 'package:nihonpath_api/src/model/sync_change.dart';
 import 'package:nihonpath_api/src/model/sync_entity_name.dart';
 import 'package:nihonpath_api/src/model/sync_op_result.dart';
@@ -44,7 +47,10 @@ part 'serializers.g.dart';
   ErrorCode,
   GuestAuthRequest,
   InvalidParam,
+  JsonWebKey,
+  JwksResponse,
   ProblemDetails,
+  RefreshTokenRequest,
   SyncChange,
   SyncEntityName,
   SyncOpResult,
@@ -74,8 +80,16 @@ Serializers serializers = (_$serializers.toBuilder()
         () => ListBuilder<ContentPack>(),
       )
       ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(JsonWebKey)]),
+        () => ListBuilder<JsonWebKey>(),
+      )
+      ..addBuilderFactory(
         const FullType(BuiltMap, [FullType(String), FullType(bool)]),
         () => MapBuilder<String, bool>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(String)]),
+        () => ListBuilder<String>(),
       )
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(SyncOpResult)]),

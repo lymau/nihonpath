@@ -24,6 +24,63 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/auth/refresh': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Rotasi refresh token
+     * @description Menerbitkan pasangan token baru dan mencabut refresh token sebelumnya; reuse mencabut seluruh family (§8.3, §12.1).
+     */
+    post: operations['refreshAuthToken'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/auth/logout': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Logout dari perangkat
+     * @description Mencabut seluruh refresh token dalam family perangkat berdasarkan refresh token peminta.
+     */
+    post: operations['logoutAuthDevice'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/.well-known/jwks.json': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Ambil JSON Web Key Set untuk verifikasi access token */
+    get: operations['getAuthJwks'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/config': {
     parameters: {
       query?: never;
@@ -229,6 +286,35 @@ export interface components {
        * @example Bearer
        */
       token_type: string;
+    };
+    RefreshTokenRequest: {
+      /**
+       * @description Refresh token 256-bit peminta
+       * @example AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+       */
+      refresh_token: string;
+    };
+    JwksResponse: {
+      keys: components['schemas']['JsonWebKey'][];
+    };
+    JsonWebKey: {
+      /** @example EC */
+      kty: string;
+      /** @example P-256 */
+      crv: string;
+      x: string;
+      y: string;
+      /** @example sig */
+      use: string;
+      /** @example ES256 */
+      alg: string;
+      kid: string;
+      /**
+       * @example [
+       *       "verify"
+       *     ]
+       */
+      key_ops: string[];
     };
     /** @description Konfigurasi sistem dan parameter dinamis */
     AppConfigResponse: {
@@ -522,6 +608,78 @@ export interface operations {
       400: components['responses']['ProblemResponse'];
       429: components['responses']['RateLimitedResponse'];
       500: components['responses']['InternalServerErrorResponse'];
+    };
+  };
+  refreshAuthToken: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RefreshTokenRequest'];
+      };
+    };
+    responses: {
+      /** @description Token berhasil dirotasi. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuthResponse'];
+        };
+      };
+      400: components['responses']['ProblemResponse'];
+      401: components['responses']['UnauthorizedResponse'];
+      500: components['responses']['InternalServerErrorResponse'];
+    };
+  };
+  logoutAuthDevice: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RefreshTokenRequest'];
+      };
+    };
+    responses: {
+      /** @description Family token perangkat berhasil dicabut. */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      400: components['responses']['ProblemResponse'];
+      401: components['responses']['UnauthorizedResponse'];
+      500: components['responses']['InternalServerErrorResponse'];
+    };
+  };
+  getAuthJwks: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Public key ES256 yang digunakan untuk verifikasi JWT. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JwksResponse'];
+        };
+      };
     };
   };
   getAppConfig: {

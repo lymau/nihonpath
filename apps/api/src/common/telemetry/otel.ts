@@ -1,6 +1,8 @@
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
+import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
+import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 
 export interface TelemetryConfig {
   serviceName: string;
@@ -22,10 +24,20 @@ export function initTelemetry(config: TelemetryConfig): NodeSDK | null {
           : `${config.otlpEndpoint.replace(/\/+$/, '')}/v1/traces`,
       })
     : undefined;
+  const metricReader = config.otlpEndpoint
+    ? new PeriodicExportingMetricReader({
+        exporter: new OTLPMetricExporter({
+          url: config.otlpEndpoint.endsWith('/v1/metrics')
+            ? config.otlpEndpoint
+            : `${config.otlpEndpoint.replace(/\/+$/, '')}/v1/metrics`,
+        }),
+      })
+    : undefined;
 
   sdkInstance = new NodeSDK({
     serviceName: config.serviceName,
     traceExporter,
+    metricReader,
     instrumentations: [
       getNodeAutoInstrumentations({
         '@opentelemetry/instrumentation-fs': {

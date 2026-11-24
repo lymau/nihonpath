@@ -55,6 +55,17 @@ export class UnauthorizedException extends AppException {
   }
 }
 
+export class RefreshTokenReusedException extends AppException {
+  constructor() {
+    super({
+      code: 'AUTH_REFRESH_REUSED',
+      status: HttpStatus.UNAUTHORIZED,
+      title: 'Refresh Token Reused',
+      detail: 'The refresh token has already been used. Sign in again.',
+    });
+  }
+}
+
 export class NotFoundException extends AppException {
   constructor(detail = 'Requested resource was not found.') {
     super({

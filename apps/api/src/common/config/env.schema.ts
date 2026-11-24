@@ -12,6 +12,8 @@ export const EnvSchema = z.object({
   USER_HASH_SECRET: z
     .string()
     .min(16, 'USER_HASH_SECRET must be at least 16 characters for secure HMAC-SHA256'),
+  AUTH_JWT_PRIVATE_KEY: z.string().min(1, 'AUTH_JWT_PRIVATE_KEY is required'),
+  AUTH_JWT_KEY_ID: z.string().min(1, 'AUTH_JWT_KEY_ID is required'),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional().or(z.literal('')),
   CORS_ORIGIN: z.string().default('*'),
 });

@@ -6,9 +6,10 @@ import { LoggingModule } from './common/logging/logging.module.js';
 import { LoggingInterceptor } from './common/logging/logging.interceptor.js';
 import { Rfc9457ExceptionFilter } from './common/errors/rfc9457-exception.filter.js';
 import { HealthModule } from './modules/health/health.module.js';
+import { AuthModule } from './modules/auth/auth.module.js';
 
 @Module({
-  imports: [ClockModule, ConfigModule.forRoot(), LoggingModule, HealthModule],
+  imports: [ClockModule, ConfigModule.forRoot(), LoggingModule, HealthModule, AuthModule],
   providers: [
     {
       provide: APP_INTERCEPTOR,

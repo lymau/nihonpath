@@ -66,6 +66,9 @@ All URIs are relative to */v1*
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
 [*AuthApi*](doc/AuthApi.md) | [**createGuestAccount**](doc/AuthApi.md#createguestaccount) | **POST** /auth/guest | Buat akun guest dan dapatkan token otentikasi
+[*AuthApi*](doc/AuthApi.md) | [**getAuthJwks**](doc/AuthApi.md#getauthjwks) | **GET** /.well-known/jwks.json | Ambil JSON Web Key Set untuk verifikasi access token
+[*AuthApi*](doc/AuthApi.md) | [**logoutAuthDevice**](doc/AuthApi.md#logoutauthdevice) | **POST** /auth/logout | Logout dari perangkat
+[*AuthApi*](doc/AuthApi.md) | [**refreshAuthToken**](doc/AuthApi.md#refreshauthtoken) | **POST** /auth/refresh | Rotasi refresh token
 [*ConfigApi*](doc/ConfigApi.md) | [**getAppConfig**](doc/ConfigApi.md#getappconfig) | **GET** /config | Ambil konfigurasi aplikasi dan parameter remote
 [*ContentApi*](doc/ContentApi.md) | [**getContentManifest**](doc/ContentApi.md#getcontentmanifest) | **GET** /content/manifest | Ambil manifest paket konten
 [*SyncApi*](doc/SyncApi.md) | [**pullSyncChanges**](doc/SyncApi.md#pullsyncchanges) | **GET** /sync/pull | Tarik mutasi perubahan dari perangkat lain
@@ -82,7 +85,10 @@ Class | Method | HTTP request | Description
  - [ErrorCode](doc/ErrorCode.md)
  - [GuestAuthRequest](doc/GuestAuthRequest.md)
  - [InvalidParam](doc/InvalidParam.md)
+ - [JsonWebKey](doc/JsonWebKey.md)
+ - [JwksResponse](doc/JwksResponse.md)
  - [ProblemDetails](doc/ProblemDetails.md)
+ - [RefreshTokenRequest](doc/RefreshTokenRequest.md)
  - [SyncChange](doc/SyncChange.md)
  - [SyncEntityName](doc/SyncEntityName.md)
  - [SyncOpResult](doc/SyncOpResult.md)
